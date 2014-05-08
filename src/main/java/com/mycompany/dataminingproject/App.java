@@ -1,7 +1,7 @@
 package com.mycompany.dataminingproject;
 
+import weka.filters.unsupervised.instance.RemoveDuplicates;
 import java.io.File;
-import weka.core.InstanceComparator;
 import weka.core.Instances;
 import weka.core.converters.CSVLoader;
 import weka.core.converters.CSVSaver;
@@ -30,20 +30,6 @@ public class App {
         return dataSet;
     }
 
-    private static Instances filterDuplicates(Instances dataSet) {
-        InstanceComparator ic = new InstanceComparator();
-        for (int i = 0; i < dataSet.numInstances() - 1; i++) {
-            for (int j = i + 1; j < dataSet.numInstances();) {
-                if (ic.compare(dataSet.instance(i), dataSet.instance(j)) == 0) {
-                    dataSet.delete(j);
-                } else {
-                    j++;
-                }
-            }
-        }
-        return dataSet;
-    }
-
     private static Instances filterDateRange(Instances dataSet, 
             String minDate, String maxDate) {
         int attrIndex = dataSet.attribute("gpsdate").index();
@@ -58,7 +44,7 @@ public class App {
     }
     
     public static void main(String[] args) throws Exception {
-        File file = new File("/home/smart-cities-23/Dropbox/Materiale-Didattico/Data Mining For Smart Cities/pechino_endtime.csv");
+        File file = new File("/home/smart-cities-23/Dropbox/Materiale-Didattico/Data Mining For Smart Cities/progettoGPS/pechino_endtime.csv");
         CSVLoader cl = new CSVLoader();
         cl.setFile(file);
         Instances dataSet = cl.getDataSet();
@@ -74,8 +60,10 @@ public class App {
         dataSet = Filter.useFilter(dataSet, removeFilter);
 
         // Filtra campioni doppi
-        dataSet = filterDuplicates(dataSet);
-
+        RemoveDuplicates removeDuplicateFilter = new RemoveDuplicates();
+        removeDuplicateFilter.setInputFormat(dataSet);
+        dataSet = Filter.useFilter(dataSet, removeDuplicateFilter);
+        
         // Filtra range di date
         dataSet = filterDateRange(dataSet, "2008-01-01", "2008-12-31");
 
