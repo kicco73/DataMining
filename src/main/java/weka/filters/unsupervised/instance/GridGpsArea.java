@@ -12,7 +12,13 @@ import weka.filters.Filter;
 import weka.filters.UnsupervisedFilter;
 
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Vector;
+import org.w3c.dom.Attr;
+import weka.core.Attribute;
+import weka.core.FastVector;
 import weka.core.InstanceComparator;
 
 /**
@@ -39,6 +45,12 @@ import weka.core.InstanceComparator;
  * <pre> -maxLng &lt;degrees&gt;
  *  The south-eastern longitude of the cropped area</pre>
  *
+ * <pre> -sizeX &lt;meters&gt;
+ *  The longitude size of a cell grid in meters. Default is 100.</pre>
+ *
+ * <pre> -sizeY &lt;meters&gt;
+ *  The latitude size of a cell grid in meters. Default is 100.</pre>
+ *
  * <pre> -latitudeAttribute &lt;attributeName&gt;
  *  The name of the latitude attribute. Default is 'latitude'.</pre>
  *
@@ -51,7 +63,7 @@ import weka.core.InstanceComparator;
  * @author Filippo Ricci
  * @version $Revision: 5548 $
  */
-public class CropGpsArea
+public class GridGpsArea
         extends Filter
         implements UnsupervisedFilter, OptionHandler {
 
@@ -65,6 +77,9 @@ public class CropGpsArea
     private double minLng = 0.0;
     private double maxLat = 0.0;
     private double maxLng = 0.0;
+    private double sizeX = 100;
+    private double sizeY = 100;
+    private Map<String, List<Instance>> cell = new HashMap<String, List<Instance>>();
     private String latitudeName = "latitude";
     private String longitudeName = "longitude";
     /**
@@ -147,8 +162,9 @@ public class CropGpsArea
     public boolean input(Instance instance) {
         double lat = instance.value(latIndex);
         double lng = instance.value(lngIndex);
-        if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng)
-            push(instance);
+        if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+            push(instance);            
+        }
         return true;
     }
 
@@ -177,7 +193,13 @@ public class CropGpsArea
         super.setInputFormat(instanceInfo);
         latIndex = instanceInfo.attribute(latitudeName).index();
         lngIndex = instanceInfo.attribute(longitudeName).index();
-        setOutputFormat(instanceInfo);
+        
+        FastVector attributes = new FastVector();
+        attributes.addElement(new Attribute("cellId"));
+        
+        attributes.addElement(new Attribute("id"));
+	Instances dataset = new Instances("grid", attributes, 200);
+        setOutputFormat(dataset);
         return true;
     }
 
@@ -229,6 +251,22 @@ public class CropGpsArea
         this.maxLng = maxLng;
     }
 
+    public double getSizeX() {
+        return sizeX;
+    }
+
+    public void setSizeX(double sizeX) {
+        this.sizeX = sizeX;
+    }
+
+    public double getSizeY() {
+        return sizeY;
+    }
+
+    public void setSizeY(double sizeY) {
+        this.sizeY = sizeY;
+    }
+
     public String getLatitudeName() {
         return latitudeName;
     }
@@ -258,6 +296,6 @@ public class CropGpsArea
      * @param argv should contain arguments to the filter: use -h for help
      */
     public static void main(String[] argv) {
-        runFilter(new CropGpsArea(), argv);
+        runFilter(new GridGpsArea(), argv);
     }
 }
