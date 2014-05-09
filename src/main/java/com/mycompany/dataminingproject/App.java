@@ -1,10 +1,15 @@
 package com.mycompany.dataminingproject;
 
 import java.io.File;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import weka.core.Attribute;
+import weka.core.FastVector;
 import weka.core.Instance;
 import weka.core.Instances;
 import weka.core.converters.CSVLoader;
@@ -30,24 +35,13 @@ public class App {
     static final String dropoffsFileName = "pechino_endtime.csv";
     static final String outFileName = "outfile.csv";
 
-    private static Instances filterDateRange(Instances dataSet,
-            String minDate, String maxDate) {
-        int attrIndex = dataSet.attribute("gpsdate").index();
-        for (int i = 0; i < dataSet.numInstances();) {
-            String attr = dataSet.instance(i).stringValue(attrIndex);
-            if (attr.compareTo(minDate) < 0 || attr.compareTo(maxDate) > 0) {
-                dataSet.delete(i);
-            } else {
-                i++;
-            }
-        }
-        return dataSet;
-    }
-
+    Date minDate = new Date(2007, 4, 13);
+    Date maxDate = new Date(2009, 9, 23);
+    static int numBins = 29;
+    
     public static double distanceInMeters(double lat1, double lng1, double lat2, double lng2) {
         final double factor = 7.91959594934121e-06;
         //System.out.println("*** distance in meters: ("+lat1+","+lng1+") - ("+lat2+","+lng2+") = " + Math.sqrt(Math.pow(lat2-lat1, 2)+Math.pow(lng2-lng1, 2))/factor);
-        ;
         return Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2)) / factor;
     }
 
@@ -55,8 +49,8 @@ public class App {
         int latIndex = inputDataSet.attribute("latitude").index();
         int lngIndex = inputDataSet.attribute("longitude").index();
 
-        double xSizeInMeters = distanceInMeters(minLat, 0, maxLat, 0);
-        double ySizeInMeters = distanceInMeters(0, minLng, 0, maxLng);
+        double xSizeInMeters = distanceInMeters(0, minLng, 0, maxLng);
+        double ySizeInMeters = distanceInMeters(minLat, 0, maxLat, 0);
         int xCells = (int) Math.ceil(xSizeInMeters / cellXSizeInMeters);
         int yCells = (int) Math.ceil(ySizeInMeters / cellYSizeInMeters);
 
@@ -67,9 +61,9 @@ public class App {
             Instance instance = inputDataSet.instance(i);
             double lat = instance.value(latIndex);
             double lng = instance.value(lngIndex);
-            int x = (int) Math.floor(distanceInMeters(minLat, 0, lat, 0) / cellXSizeInMeters);
-            int y = (int) Math.floor(distanceInMeters(0, minLng, 0, lng) / cellYSizeInMeters);
-            String key = "(" + x + "," + y + ")";
+            int x = (int) Math.floor(distanceInMeters(0, minLng, 0, lng) / cellXSizeInMeters);
+            int y = (int) Math.floor(distanceInMeters(minLat, 0, lat, 0) / cellYSizeInMeters);
+            String key = "(" + y + ";" + x + ")";
             List<Instance> cell = grid.get(key);
             if (cell == null) {
                 cell = new ArrayList<Instance>();
@@ -105,6 +99,29 @@ public class App {
         return dataSet;
     }
 
+    private Map<String, List<Integer>> makeBins(Map<String, List<Instance>> grid, Instances dataSet, Date minDate, Date maxDate, int numBins) throws ParseException {
+        Map<String, List<Integer>> result = new HashMap<String, List<Integer>>();
+        SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+        long binDuration = (maxDate.getTime() - minDate.getTime()) / numBins;
+        int dateIndex = dataSet.attribute("gpsdate").index();
+        for(String cellId: grid.keySet()) {
+            for(Instance instance: grid.get(cellId)) {
+                String dateStr = instance.stringValue(dateIndex);
+                Date gpsDate = format.parse(dateStr);
+                int bin = (int)(gpsDate.getTime() - minDate.getTime()) /(int)binDuration;
+                List<Integer> resultCell = result.get(cellId);
+                if(resultCell == null) {
+                    resultCell = new ArrayList<Integer>(bin);
+                    for(int i = 0; i < bin; i++)
+                        resultCell.set(i, 0);
+                    result.put(cellId, resultCell);
+                }
+                resultCell.set(bin, resultCell.get(bin)+1);
+            }
+        }
+        return result;
+    }
+    
     public void run(String pickUpName, String dropOffName, String outName) throws Exception {
         System.out.println("*** " + getClass().getResource("/resources/" + pickupsFileName));
         System.out.println(getClass().getResource("/resources/pechino_endtime.csv"));
@@ -132,7 +149,51 @@ public class App {
 
         Map<String, List<Instance>> grid = new HashMap<String, List<Instance>>();
         populateGrid(grid, pickUps);
+        Map<String, List<Integer>> pickUpsAggregate = makeBins(grid, pickUps, minDate, maxDate, numBins);
+        grid.clear();
         populateGrid(grid, dropOffs);
+        Map<String, List<Integer>> dropOffAggregate = makeBins(grid, dropOffs, minDate, maxDate, numBins);
+
+        FastVector attributes = new FastVector();
+        Attribute cellId = new Attribute("cellId");
+        attributes.addElement(cellId);
+        for(int i = 0; i < numBins; i++) {
+            attributes.addElement(new Attribute("up"+i));
+            attributes.addElement(new Attribute("dn"+i));
+        }
+	Instances dataset = new Instances("grid", attributes, 200);
+        for(String key: pickUpsAggregate.keySet()) {
+            List<Integer> pickupFeatures = pickUpsAggregate.get(key);
+            List<Integer> dropoffFeatures = dropOffAggregate.get(key);
+            Instance instance = new Instance(1+2*numBins);
+            instance.setValue(cellId, key);
+            for(int i = 0; i < numBins; i++) {
+                Attribute a = dataset.attribute("up"+i);
+                instance.setValue(a, pickupFeatures.get(i));
+                a = dataset.attribute("dn"+i);
+                double dropOffValue = 0.0;
+                if(dropoffFeatures != null)
+                    dropOffValue = dropoffFeatures.get(i);
+                instance.setValue(a, dropOffValue);
+            }
+            dataset.add(instance);
+            if(dropoffFeatures != null)
+                dropOffAggregate.remove(key);
+        }
+        for(String key: dropOffAggregate.keySet()) {
+            List<Integer> pickupFeatures = pickUpsAggregate.get(key);
+            List<Integer> dropoffFeatures = dropOffAggregate.get(key);
+            Instance instance = new Instance(1+2*numBins);
+            instance.setValue(cellId, key);
+            for(int i = 0; i < numBins; i++) {
+                Attribute a = dataset.attribute("dn"+i);
+                instance.setValue(a, dropoffFeatures.get(i));
+                a = dataset.attribute("up"+i);
+                instance.setValue(a, 0.0);
+            }
+            dataset.add(instance);
+        }     
+        
         for(String key: grid.keySet()) {
             System.out.println("Cell: "+key+", #instances: "+grid.get(key).size());
         }
@@ -142,7 +203,7 @@ public class App {
         File out = new File(outName);
         CSVSaver saver = new CSVSaver();
         saver.setFile(out);
-        saver.setInstances(dropOffs);
+        saver.setInstances(dataset);
         saver.writeBatch();
     }
 

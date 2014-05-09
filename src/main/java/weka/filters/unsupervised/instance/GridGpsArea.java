@@ -2,6 +2,8 @@
  */
 package weka.filters.unsupervised.instance;
 
+import static com.mycompany.dataminingproject.App.distanceInMeters;
+import java.util.ArrayList;
 import weka.core.Capabilities;
 import weka.core.Instance;
 import weka.core.Instances;
@@ -79,6 +81,8 @@ public class GridGpsArea
     private double maxLng = 0.0;
     private double sizeX = 100;
     private double sizeY = 100;
+    final double cellXSizeInMeters = 100;
+    final double cellYSizeInMeters = 100;
     private Map<String, List<Instance>> cell = new HashMap<String, List<Instance>>();
     private String latitudeName = "latitude";
     private String longitudeName = "longitude";
@@ -160,11 +164,7 @@ public class GridGpsArea
 
     @Override
     public boolean input(Instance instance) {
-        double lat = instance.value(latIndex);
-        double lng = instance.value(lngIndex);
-        if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
-            push(instance);            
-        }
+
         return true;
     }
 
