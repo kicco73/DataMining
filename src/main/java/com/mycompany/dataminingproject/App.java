@@ -8,6 +8,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Properties;
 import weka.core.Instances;
+import weka.core.converters.ArffSaver;
 import weka.core.converters.CSVLoader;
 import weka.core.converters.CSVSaver;
 import weka.filters.Filter;
@@ -31,7 +32,8 @@ public class App {
     static Date maxDate;
     static String pickupsFileName;
     static String dropoffsFileName;
-    static String outFileName;
+    static String csvOutFileName;
+    static String arffOutFileName;
 
     private void loadProps(String propertiesName) {
         Properties config;
@@ -44,7 +46,8 @@ public class App {
             SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
             pickupsFileName = getClass().getResource("/resources/"+config.getProperty("pickupsFileName")).getFile();
             dropoffsFileName = getClass().getResource("/resources/"+config.getProperty("dropoffsFileName")).getFile();
-            outFileName = config.getProperty("outFileName");
+            csvOutFileName = config.getProperty("csvOutFileName");
+            arffOutFileName = config.getProperty("arffOutFileName");
 
             nwLat = Double.parseDouble(config.getProperty("gridGpsArea.nwLat"));
             nwLng = Double.parseDouble(config.getProperty("gridGpsArea.nwLng"));
@@ -71,8 +74,17 @@ public class App {
 
     
     public static void saveCsv(String fileName, Instances finalFeatures) throws IOException {
-        File out = new File(outFileName);
+        File out = new File(fileName);
         CSVSaver saver = new CSVSaver();
+        saver.setFile(out);
+        saver.setInstances(finalFeatures);
+        saver.writeBatch();
+        System.out.println("DONE");
+    }
+    
+    public static void saveArff(String fileName, Instances finalFeatures) throws IOException {
+        File out = new File(fileName);
+        ArffSaver saver = new ArffSaver();
         saver.setFile(out);
         saver.setInstances(finalFeatures);
         saver.writeBatch();
@@ -145,7 +157,8 @@ public class App {
 
         // Export to filesystem
         
-        saveCsv(outFileName, finalFeatures);
+        saveCsv(csvOutFileName, finalFeatures);
+        saveArff(arffOutFileName, finalFeatures);
     }
 
     public static void main(String[] args) throws Exception {
