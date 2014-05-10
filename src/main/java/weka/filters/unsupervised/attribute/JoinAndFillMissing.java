@@ -217,33 +217,33 @@ public class JoinAndFillMissing
         return result;
     }
        
-    private Instances join(Instances mainDataSet, Instances secondaryDataSet) {
-        int totalMissing = 0;
-        Map<String, Instance> mainMap = convertToMap(mainDataSet);
-        Map<String, Instance> secondaryMap = convertToMap(secondaryDataSet);
+    private Instances join(Instances firstSet, Instances secondSet) {
+        int missingInSecondSet = 0;
+        int missingInFirstSet = 0;
+        Map<String, Instance> secondMap = convertToMap(secondSet);
         FastVector attributes = new FastVector();
         attributes.addElement(new Attribute("cellId", (FastVector) null));
         int n = 0;
-        for (int i = 0; i < mainDataSet.numAttributes(); i++) {
-            if(mainDataSet.attribute(i).isNumeric()) {
+        for (int i = 0; i < firstSet.numAttributes(); i++) {
+            if(firstSet.attribute(i).isNumeric()) {
                 attributes.addElement(new Attribute("up" + i));
                 attributes.addElement(new Attribute("dn" + i));
                 n++;
             }
         }
-        Instances dataset = new Instances("grid", attributes, mainDataSet.numInstances());
-        Attribute cellId = mainDataSet.attribute("cellId");
+        Instances dataset = new Instances("grid", attributes, firstSet.numInstances());
+        Attribute cellId = firstSet.attribute("cellId");
 
-        for (int j = 0; j < mainDataSet.numInstances(); j++) {
-            Instance mainInstance = mainDataSet.instance(j);
+        for (int j = 0; j < firstSet.numInstances(); j++) {
+            Instance mainInstance = firstSet.instance(j);
             String key = mainInstance.stringValue(cellId);
-            Instance secondaryInstance = secondaryMap.get(key);
+            Instance secondaryInstance = secondMap.get(key);
             Instance instance = new Instance(1 + 2*n);
             instance.setDataset(dataset);
             instance.setValue(0, key);
             int m = 1;
-            for (int i = 0; i < mainDataSet.numAttributes(); i++) {
-                if(mainDataSet.attribute(i).isNumeric()) {
+            for (int i = 0; i < firstSet.numAttributes(); i++) {
+                if(firstSet.attribute(i).isNumeric()) {
                    double secondValue = secondaryInstance != null?
                        secondaryInstance.value(i) : 0.0;
                    instance.setValue(m++, mainInstance.value(i));
@@ -251,26 +251,27 @@ public class JoinAndFillMissing
                 }
             }
             if(secondaryInstance != null)
-                secondaryMap.remove(key);
-            else totalMissing++;
+                secondMap.remove(key);
+            else 
+                missingInSecondSet++;
             dataset.add(instance);
         }
-        for (String key : secondaryMap.keySet()) {
-            Instance secondaryInstance = secondaryMap.get(key);
+        for (String key : secondMap.keySet()) {
+            Instance secondaryInstance = secondMap.get(key);
             Instance instance = new Instance(1 + 2*n);
             instance.setDataset(dataset);
             instance.setValue(0, key);
             int m = 1;
-            for (int i = 0; i < mainDataSet.numAttributes(); i++) {
-                if(mainDataSet.attribute(i).isNumeric()) {
+            for (int i = 0; i < firstSet.numAttributes(); i++) {
+                if(firstSet.attribute(i).isNumeric()) {
                    instance.setValue(m++, 0.0);
                    instance.setValue(m++, secondaryInstance.value(i));
                 }
             }
             dataset.add(instance);
-            totalMissing++;
+            missingInFirstSet++;
         }
-        System.out.println("JOINED; total missing: "+totalMissing);
+        System.out.println("JoinAndFillMissing(): final samples: "+dataset.numInstances()+"; missing in first set: "+missingInFirstSet+", missing in second set: "+ missingInSecondSet);
         return dataset;
     }
 

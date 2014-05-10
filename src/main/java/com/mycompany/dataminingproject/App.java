@@ -99,8 +99,6 @@ public class App {
         removeFilter.setAttributeIndicesArray(removeIndices);
         removeFilter.setInputFormat(dataSet);
         dataSet = Filter.useFilter(dataSet, removeFilter);
-
-        System.out.println("Numero campioni: " + dataSet.numInstances());
         return dataSet;
     }
 
@@ -112,6 +110,9 @@ public class App {
         binMaker.setNumBins(numBins);
         binMaker.setInputFormat(dataSet);
         dataSet = Filter.useFilter(dataSet, binMaker);
+        NormalizeGrid normalizer = new NormalizeGrid();
+        normalizer.setInputFormat(dataSet);
+        dataSet = Filter.useFilter(dataSet, normalizer);
         return dataSet;
     }
     
@@ -120,9 +121,6 @@ public class App {
         joinAndFillMissing.setComplementaryDataSet(dropOffs);
         joinAndFillMissing.setInputFormat(pickUps);
         Instances dataSet = Filter.useFilter(pickUps, joinAndFillMissing);
-        NormalizeGrid normalizer = new NormalizeGrid();
-        normalizer.setInputFormat(dataSet);
-        dataSet = Filter.useFilter(dataSet, normalizer);
         return dataSet;
     }
     
@@ -141,7 +139,7 @@ public class App {
         dropOffs = cleanData(dropOffs);
         dropOffs = createFeatures(dropOffs);
 
-        // Join features into one bigger set then normalize.
+        // Join features into one bigger set
 
         Instances finalFeatures = joinFeatures(pickUps, dropOffs);
 

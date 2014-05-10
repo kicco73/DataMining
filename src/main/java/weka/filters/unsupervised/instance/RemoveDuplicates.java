@@ -38,7 +38,8 @@ public class RemoveDuplicates
      * for serialization
      */
     static final long serialVersionUID = 3119607037607101161L;
-
+    private int pushed = 0;
+    private int removed = 0;
     /**
      * Returns a string describing this classifier
      *
@@ -126,11 +127,13 @@ public class RemoveDuplicates
         }
         for (int i = 0; i < dataset.numInstances(); i++) {
             if (ic.compare(dataset.instance(i), instance) == 0) {
-                System.out.println("--- REMOVED: "+instance);
+                //System.out.println("RemoveDuplicates(): removing "+instance);
+                removed++;
                 return true;
             }
         }
         bufferInput(instance);
+        pushed++;
         return true;
     }
     
@@ -138,6 +141,7 @@ public class RemoveDuplicates
         for(int i=0; i < getInputFormat().numInstances(); i++)
             push(getInputFormat().instance(i));
         flushInput();
+        System.out.println("RemoveDuplicates(): pushed "+pushed+" instances, removed "+removed+" duplicates");
         return super.batchFinished();
     }
 

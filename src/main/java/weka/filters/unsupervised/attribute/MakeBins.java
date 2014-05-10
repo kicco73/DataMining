@@ -301,7 +301,6 @@ public class MakeBins
             }
             dataset.add(instance);
         }
-        System.out.println("CONVERTED");
         return dataset;
     }
 
@@ -324,6 +323,7 @@ public class MakeBins
         for(int i = 0; i < instances.numInstances(); i++)
             push(instances.instance(i));
         m_NewBatch = true;
+        System.out.println("MakeBins(): created "+numBins+" time bins");
         return false;
     }
 

@@ -84,6 +84,8 @@ public class GridGpsArea
     private String latitudeName = "latitude";
     private String longitudeName = "longitude";
     private Attribute cellId;
+    private int pushed = 0;
+    private int removed = 0;
 
     /**
      * Returns a string describing this classifier
@@ -182,11 +184,17 @@ public class GridGpsArea
             outInstance.insertAttributeAt(instance.numAttributes());
             push(outInstance);
             outInstance.setValue(instance.numAttributes(), key);
-            System.out.println("*** " + outInstance);
-        }
+            pushed++;
+        } else removed++;
         return true;
     }
 
+    @Override
+    public boolean batchFinished() throws Exception {
+        System.out.println("GridGpsArea(): kept "+pushed+" instances, "+removed+" removed");
+        return super.batchFinished();
+    }
+    
     /**
      * Signify that this batch of input to the filter is finished. If the filter
      * requires all instances prior to filtering, output() may now be called to

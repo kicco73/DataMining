@@ -59,7 +59,7 @@ public class NormalizeGrid
      * for serialization.
      */
     static final long serialVersionUID = -8158531150984362899L;
-
+    int pushed = 0;
     /**
      * Returns a string describing this filter.
      *
@@ -225,6 +225,7 @@ public class NormalizeGrid
                 normalizedInstance.setValue(i, instance.value(i));
         }
         push(normalizedInstance);
+        pushed++;
         return true;
     }
 
@@ -242,8 +243,9 @@ public class NormalizeGrid
         if (getInputFormat() == null) {
             throw new IllegalStateException("No input instance format defined");
         }
-
         m_NewBatch = true;
+        System.out.println("NormalizeGrid(): normalized "+pushed
+                +" instances with "+ getOutputFormat().numAttributes()+" attrs");
         return false;
     }
 
