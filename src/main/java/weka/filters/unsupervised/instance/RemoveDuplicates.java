@@ -92,7 +92,6 @@ public class RemoveDuplicates
     public Capabilities getCapabilities() {
         Capabilities result = super.getCapabilities();
         result.disableAll();
-
         // attributes
         result.enableAllAttributes();
         result.enable(Capability.MISSING_VALUES);
@@ -115,14 +114,31 @@ public class RemoveDuplicates
     private InstanceComparator ic = new InstanceComparator();
 
     @Override
+
     public boolean input(Instance instance) {
-        for (int i = 0; i < getOutputFormat().numInstances(); i++) {
-            if (ic.compare(getInputFormat().instance(i), instance) == 0) {
+        Instances dataset = getInputFormat();
+        if (dataset == null) {
+            throw new IllegalStateException("No input instance format defined");
+        }
+        if (m_NewBatch) {
+            resetQueue();
+            m_NewBatch = false;
+        }
+        for (int i = 0; i < dataset.numInstances(); i++) {
+            if (ic.compare(dataset.instance(i), instance) == 0) {
+                System.out.println("--- REMOVED: "+instance);
                 return true;
             }
         }
-        push(instance);
+        bufferInput(instance);
         return true;
+    }
+    
+    public boolean batchFinished() throws Exception {
+        for(int i=0; i < getInputFormat().numInstances(); i++)
+            push(getInputFormat().instance(i));
+        flushInput();
+        return super.batchFinished();
     }
 
     /**
