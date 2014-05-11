@@ -217,12 +217,12 @@ public class GridGpsArea
     public boolean setInputFormat(Instances instanceInfo)
             throws Exception {
 
+        latIndex = instanceInfo.attribute(latitudeName).index();
+        lngIndex = instanceInfo.attribute(longitudeName).index();
         super.setInputFormat(instanceInfo);
         Instances output = new Instances(instanceInfo,instanceInfo.numInstances());
         cellId = new Attribute("cellId", (FastVector)null);
         output.insertAttributeAt(cellId, output.numAttributes());
-        latIndex = output.attribute(latitudeName).index();
-        lngIndex = output.attribute(longitudeName).index();
         setOutputFormat(output);
         return true;
     }
@@ -275,23 +275,7 @@ public class GridGpsArea
         this.seLng = seLng;
     }
 
-    public String getLatitudeName() {
-        return latitudeName;
-    }
-
-    public void setLatitudeName(String latitudeName) {
-        this.latitudeName = latitudeName;
-    }
-
-    public String getLongitudeName() {
-        return longitudeName;
-    }
-
-    public void setLongitudeName(String longitudeName) {
-        this.longitudeName = longitudeName;
-    }
-
-    public double getCellXSizeInMeters() {
+      public double getCellXSizeInMeters() {
         return cellXSizeInMeters;
     }
 
@@ -319,6 +303,22 @@ public class GridGpsArea
         setCellYSizeInMeters(weMeters);
     }
     
+    public String getLatitudeName() {
+        return latitudeName;
+    }
+
+    public void setLatitudeName(String latitudeName) {
+        this.latitudeName = latitudeName;
+    }
+
+    public String getLongitudeName() {
+        return longitudeName;
+    }
+
+    public void setLongitudeName(String longitudeName) {
+        this.longitudeName = longitudeName;
+    }
+
     /**
      * Main method for testing this class.
      *

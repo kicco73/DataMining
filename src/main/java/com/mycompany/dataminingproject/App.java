@@ -14,6 +14,7 @@ import weka.core.converters.CSVSaver;
 import weka.filters.Filter;
 import weka.filters.unsupervised.attribute.JoinAndFillMissing;
 import weka.filters.unsupervised.attribute.MakeBins;
+import weka.filters.unsupervised.attribute.GridAddLatLng;
 import weka.filters.unsupervised.attribute.NormalizeGrid;
 import weka.filters.unsupervised.attribute.Remove;
 import weka.filters.unsupervised.instance.GridGpsArea;
@@ -79,7 +80,7 @@ public class App {
         saver.setFile(out);
         saver.setInstances(finalFeatures);
         saver.writeBatch();
-        System.out.println("DONE");
+        System.out.println("*** CSV SAVED");
     }
     
     public static void saveArff(String fileName, Instances finalFeatures) throws IOException {
@@ -88,7 +89,7 @@ public class App {
         saver.setFile(out);
         saver.setInstances(finalFeatures);
         saver.writeBatch();
-        System.out.println("DONE");
+        System.out.println("*** ARFF SAVED");
     }
     
     public static Instances cleanData(Instances rawDataSet) throws Exception {
@@ -133,6 +134,11 @@ public class App {
         joinAndFillMissing.setComplementaryDataSet(dropOffs);
         joinAndFillMissing.setInputFormat(pickUps);
         Instances dataSet = Filter.useFilter(pickUps, joinAndFillMissing);
+        GridAddLatLng mapGridToGps = new GridAddLatLng();
+        mapGridToGps.setArea(nwLat, nwLng, seLat, seLng);
+        mapGridToGps.setCell(cellXSizeInMeters, cellYSizeInMeters);
+        mapGridToGps.setInputFormat(dataSet);
+        dataSet = Filter.useFilter(dataSet, mapGridToGps);
         return dataSet;
     }
     
