@@ -44,8 +44,9 @@ public class App {
     static String csvOutFileName;
     static String arffOutFileName;
     static int numClusters;
+    static MakeBins.Period period;
 
-    private void loadProps(String propertiesName) {
+    private void loadProps(String propertiesName) throws ParseException {
         Properties config;
 
         try {
@@ -66,7 +67,11 @@ public class App {
             cellXSizeInMeters = Double.parseDouble(config.getProperty("gridGpsArea.cellXSizeInMeters"));
             cellYSizeInMeters = Double.parseDouble(config.getProperty("gridGpsArea.cellYSizeInMeters"));
             minDate = format.parse(config.getProperty("makeBins.minDate"));
-            maxDate = format.parse(config.getProperty("makeBins.maxDate"));
+            maxDate = format.parse(config.getProperty("makeBins.maxDate"));                
+            period = MakeBins.Period.LINEAR;
+            for(MakeBins.Period p: MakeBins.Period.values()) 
+                if(p.name().equalsIgnoreCase(config.getProperty("makeBins.period")))
+                    period = p;
             numBins = Integer.parseInt(config.getProperty("makeBins.numBins", "1"));
             numClusters = Integer.parseInt(config.getProperty("numClusters", "3"));
         } catch (ParseException ioe) {
@@ -133,6 +138,7 @@ public class App {
         binMaker.setMinDate(minDate);
         binMaker.setMaxDate(maxDate);
         binMaker.setNumBins(numBins);
+        binMaker.setPeriod(period);
         binMaker.setInputFormat(dataSet);
         dataSet = Filter.useFilter(dataSet, binMaker);
         // Normalizza

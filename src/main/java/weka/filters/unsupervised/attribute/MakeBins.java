@@ -7,6 +7,7 @@ package weka.filters.unsupervised.attribute;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import weka.core.Capabilities;
 import weka.core.Instance;
@@ -90,11 +91,11 @@ public class MakeBins
 
     public enum Period {
 
-        LINEAR, BY_DAY_OF_WEEK, BY_MONTH_OF_YEAR
+        LINEAR, BY_HOURS_IN_A_DAY, BY_DAY_OF_WEEK, BY_MONTH_OF_YEAR
     };
 
     private Period period = Period.LINEAR;
-    private SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+    private SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
     private Map<String, int[]> aggregate;
 
     /**
@@ -235,6 +236,8 @@ public class MakeBins
         if (m_NewBatch) {
             resetQueue();
             final long oneDay = 86400 * 1000;
+            if(period == Period.BY_HOURS_IN_A_DAY)
+                numBins = numBins < 24? numBins : 24;
             binDuration = (maxDate.getTime() + oneDay - minDate.getTime()) / numBins;
             aggregate = new HashMap<String, int[]>();
             m_NewBatch = false;
@@ -249,6 +252,9 @@ public class MakeBins
             case LINEAR:
                 bin = (int) ((gpsDate.getTime() - minDate.getTime()) / binDuration);
                 break;
+            case BY_HOURS_IN_A_DAY:
+                bin = gpsDate.getHours() * numBins / 24;
+                break;
             case BY_DAY_OF_WEEK:
                 // TODO
                 break;
@@ -262,8 +268,9 @@ public class MakeBins
     private Map<String, int[]> make(Instance instance) {
         Attribute cellId = getInputFormat().attribute("cellId");
         int dateIndex = getInputFormat().attribute("gpsdate").index();
+        int timeIndex = getInputFormat().attribute("gpstime").index();
         String key = instance.stringValue(cellId.index());
-        String dateStr = instance.stringValue(dateIndex);
+        String dateStr = instance.stringValue(dateIndex)+" "+instance.stringValue(timeIndex);
         try {
             Date gpsDate = format.parse(dateStr);
             int bin = getBinIndex(gpsDate);
