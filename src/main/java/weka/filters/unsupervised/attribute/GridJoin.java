@@ -54,7 +54,7 @@ import weka.core.FastVector;
  * @author Filippo Ricci
  * @version $Revision: 5987 $
  */
-public class JoinAndFillMissing
+public class GridJoin
         extends PotentialClassIgnorer
         implements UnsupervisedFilter, OptionHandler {
 
@@ -323,6 +323,6 @@ public class JoinAndFillMissing
      * @param args should contain arguments to the filter, use -h for help
      */
     public static void main(String[] args) {
-        runFilter(new JoinAndFillMissing(), args);
+        runFilter(new GridJoin(), args);
     }
 }

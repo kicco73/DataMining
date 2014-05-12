@@ -7,16 +7,24 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Properties;
+import weka.core.CosineDistance;
+import weka.clusterers.HierarchicalClusterer;
+import weka.clusterers.SimpleKMeans;
+import weka.core.Attribute;
+import weka.core.DistanceFunction;
+import weka.core.EuclideanDistance;
+import weka.core.Instance;
 import weka.core.Instances;
 import weka.core.converters.ArffSaver;
 import weka.core.converters.CSVLoader;
 import weka.core.converters.CSVSaver;
 import weka.filters.Filter;
-import weka.filters.unsupervised.attribute.JoinAndFillMissing;
-import weka.filters.unsupervised.attribute.MakeBins;
 import weka.filters.unsupervised.attribute.GridAddLatLng;
-import weka.filters.unsupervised.attribute.NormalizeGrid;
+import weka.filters.unsupervised.attribute.GridJoin;
+import weka.filters.unsupervised.attribute.GridNormalize;
+import weka.filters.unsupervised.attribute.MakeBins;
 import weka.filters.unsupervised.attribute.Remove;
+import weka.filters.unsupervised.attribute.StringToNominal;
 import weka.filters.unsupervised.instance.GridGpsArea;
 import weka.filters.unsupervised.instance.RemoveDuplicates;
 
@@ -35,6 +43,7 @@ public class App {
     static String dropoffsFileName;
     static String csvOutFileName;
     static String arffOutFileName;
+    static int numClusters;
 
     private void loadProps(String propertiesName) {
         Properties config;
@@ -59,6 +68,7 @@ public class App {
             minDate = format.parse(config.getProperty("makeBins.minDate"));
             maxDate = format.parse(config.getProperty("makeBins.maxDate"));
             numBins = Integer.parseInt(config.getProperty("makeBins.numBins", "1"));
+            numClusters = Integer.parseInt(config.getProperty("numClusters", "3"));
         } catch (ParseException ioe) {
             System.err.println("ParseException in loadProps");
         } catch (IOException ioe) {
@@ -112,10 +122,12 @@ public class App {
         removeFilter.setAttributeIndicesArray(removeIndices);
         removeFilter.setInputFormat(dataSet);
         dataSet = Filter.useFilter(dataSet, removeFilter);
+        
         return dataSet;
     }
 
     public static Instances createFeatures(Instances dataSet) throws Exception {
+        // Crea bin temporali
         MakeBins binMaker = new MakeBins();
         binMaker.setPeriod(MakeBins.Period.LINEAR);
         binMaker.setMinDate(minDate);
@@ -123,23 +135,54 @@ public class App {
         binMaker.setNumBins(numBins);
         binMaker.setInputFormat(dataSet);
         dataSet = Filter.useFilter(dataSet, binMaker);
-        NormalizeGrid normalizer = new NormalizeGrid();
+        // Normalizza
+        GridNormalize normalizer = new GridNormalize();
         normalizer.setInputFormat(dataSet);
         dataSet = Filter.useFilter(dataSet, normalizer);
         return dataSet;
     }
     
     public static Instances joinFeatures(Instances pickUps, Instances dropOffs) throws Exception {
-        JoinAndFillMissing joinAndFillMissing = new JoinAndFillMissing();
+        GridJoin joinAndFillMissing = new GridJoin();
         joinAndFillMissing.setComplementaryDataSet(dropOffs);
         joinAndFillMissing.setInputFormat(pickUps);
         Instances dataSet = Filter.useFilter(pickUps, joinAndFillMissing);
+        // Aggiunge coordinate geografiche
         GridAddLatLng mapGridToGps = new GridAddLatLng();
         mapGridToGps.setArea(nwLat, nwLng, seLat, seLng);
         mapGridToGps.setCell(cellXSizeInMeters, cellYSizeInMeters);
         mapGridToGps.setInputFormat(dataSet);
-        dataSet = Filter.useFilter(dataSet, mapGridToGps);
+        dataSet = Filter.useFilter(dataSet, mapGridToGps);        
+        // Trasforma stringhe in nominali
+        StringToNominal stringToNominal = new StringToNominal();
+        stringToNominal.setAttributeRange("first-last");
+        stringToNominal.setInputFormat(dataSet);
+        dataSet = Filter.useFilter(dataSet, stringToNominal);        
         return dataSet;
+    }
+    
+    private int[] kMeans(DistanceFunction df, Instances finalFeatures) throws Exception {
+        SimpleKMeans simpleKMeans = new SimpleKMeans();
+        // There's a bug in the default random initializer, so we use 1 = kmeans++
+        String options[] = {"-init", "1"};
+        simpleKMeans.setOptions(options);
+        simpleKMeans.setNumClusters(numClusters);
+        simpleKMeans.setDistanceFunction(df);
+        simpleKMeans.setPreserveInstancesOrder(true);
+        simpleKMeans.buildClusterer(finalFeatures);
+        return simpleKMeans.getAssignments();
+    }
+    
+    
+    private int[] agglomerative(DistanceFunction df, Instances finalFeatures) throws Exception {
+        HierarchicalClusterer clusterer = new HierarchicalClusterer();
+        clusterer.setNumClusters(numClusters);
+        clusterer.setDistanceFunction(df);
+        clusterer.buildClusterer(finalFeatures);
+        int [] assignments = new int[finalFeatures.numInstances()];
+        for(int i = 0; i < finalFeatures.numInstances(); i++)
+            assignments[i] = clusterer.clusterInstance(finalFeatures.instance(i));
+        return assignments;
     }
     
     public void run(String configName) throws Exception {
@@ -161,10 +204,37 @@ public class App {
 
         Instances finalFeatures = joinFeatures(pickUps, dropOffs);
 
-        // Export to filesystem
+        // Clustering with different algorithms and distance functions
         
+        int kMeansAssignments[] = kMeans(new EuclideanDistance(), finalFeatures);
+        int kMeansCosineAssignments[] = kMeans(new CosineDistance(), finalFeatures);
+        int agglomerativeAssignments[] = agglomerative(new EuclideanDistance(), finalFeatures);
+        int agglomerativeCosineAssignments[] = agglomerative(new CosineDistance(), finalFeatures);
+        
+        // Add clustering results to dataset
+        
+        Attribute kMeansClusterId = new Attribute("kMeansEuclidean", 0);
+        finalFeatures.insertAttributeAt(kMeansClusterId, 0);
+        Attribute kMeansCosineClusterId = new Attribute("kMeansCosine", 1);
+        finalFeatures.insertAttributeAt(kMeansCosineClusterId, 1);
+        Attribute agglomerativeId = new Attribute("agglomerativeEuclidean", 2);
+        finalFeatures.insertAttributeAt(agglomerativeId, 2);
+        Attribute agglomerativeCosineId = new Attribute("agglomerativeCosine", 3);
+        finalFeatures.insertAttributeAt(agglomerativeCosineId, 3);
+
+        for(int i = 0; i < finalFeatures.numInstances(); i++) {
+            Instance instance = finalFeatures.instance(i);
+            instance.setValue(kMeansClusterId, kMeansAssignments[i]);
+            instance.setValue(kMeansCosineClusterId, kMeansCosineAssignments[i]);
+            instance.setValue(agglomerativeId, agglomerativeAssignments[i]);
+            instance.setValue(agglomerativeCosineId, agglomerativeCosineAssignments[i]);
+        }
+        
+        // Export to filesystem
+
         saveCsv(csvOutFileName, finalFeatures);
         saveArff(arffOutFileName, finalFeatures);
+        
     }
 
     public static void main(String[] args) throws Exception {

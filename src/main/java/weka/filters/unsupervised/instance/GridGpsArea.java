@@ -3,24 +3,21 @@
 package weka.filters.unsupervised.instance;
 
 import java.util.ArrayList;
-import weka.core.Capabilities;
-import weka.core.Instance;
-import weka.core.Instances;
-import weka.core.OptionHandler;
-import weka.core.RevisionUtils;
-import weka.core.Capabilities.Capability;
-import weka.filters.Filter;
-import weka.filters.UnsupervisedFilter;
-
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
-import org.w3c.dom.Attr;
 import weka.core.Attribute;
+import weka.core.Capabilities;
+import weka.core.Capabilities.Capability;
 import weka.core.FastVector;
-import weka.core.InstanceComparator;
+import weka.core.Instance;
+import weka.core.Instances;
+import weka.core.OptionHandler;
+import weka.core.RevisionUtils;
+import weka.filters.Filter;
+import weka.filters.UnsupervisedFilter;
 
 /**
  * <!-- globalinfo-start -->
@@ -128,7 +125,7 @@ public class GridGpsArea
      * @return an array of strings suitable for passing to setOptions
      */
     public String[] getOptions() {
-        Vector<String> result = new Vector();
+        List<String> result = new ArrayList<String>();
         return result.toArray(new String[result.size()]);
     }
 
@@ -154,7 +151,14 @@ public class GridGpsArea
 
         return result;
     }
-
+    
+    private static double distanceInMeters(double lat1, double lng1, double lat2, double lng2) {
+        final double factor = 7.91959594934121e-06;
+        //System.out.println("*** distance in meters: ("+lat1+","+lng1+") - ("+lat2+","+lng2+") = " + Math.sqrt(Math.pow(lat2-lat1, 2)+Math.pow(lng2-lng1, 2))/factor);
+        double dlng = Math.abs(lng2-lng1) >= Math.PI? Math.abs(lng2-lng1) - Math.PI : lng2-lng1;
+        return Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(dlng, 2)) / factor;
+    }
+    
     /**
      * Input an instance for filtering.
      *
@@ -162,21 +166,16 @@ public class GridGpsArea
      * @return true if the filtered instance may now be collected with output().
      * @throws IllegalStateException if no input structure has been defined
      */
-
-    public static double distanceInMeters(double lat1, double lng1, double lat2, double lng2) {
-        final double factor = 7.91959594934121e-06;
-        //System.out.println("*** distance in meters: ("+lat1+","+lng1+") - ("+lat2+","+lng2+") = " + Math.sqrt(Math.pow(lat2-lat1, 2)+Math.pow(lng2-lng1, 2))/factor);
-        double dlng = Math.abs(lng2-lng1) >= Math.PI? Math.abs(lng2-lng1) - Math.PI : lng2-lng1;
-        return Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(dlng, 2)) / factor;
-    }
-
     @Override
     public boolean input(Instance instance) {
         if (getInputFormat() == null)
             throw new IllegalStateException("No input instance format defined");
         double lat = instance.value(latIndex);
         double lng = instance.value(lngIndex);
-        if (lat >= nwLat && lat <= seLat && lng >= nwLng && lng <= seLng) {
+
+        // FIXME considerare il caso in cui l'area è attraversata dal meridiano 180!
+        
+        if (lat <= nwLat && lat >= seLat && lng >= nwLng && lng <= seLng) {
             int x = (int) Math.floor(distanceInMeters(0, nwLng, 0, lng) / cellXSizeInMeters);
             int y = (int) Math.floor(distanceInMeters(nwLat, 0, lat, 0) / cellYSizeInMeters);
             String key = "(" + y + ";" + x + ")";

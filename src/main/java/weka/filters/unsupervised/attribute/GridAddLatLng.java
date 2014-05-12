@@ -234,15 +234,15 @@ public class GridAddLatLng
         m.matches();
         int yCell = Integer.parseInt(m.group(1));
         int xCell = Integer.parseInt(m.group(2));
-        // FIXME vorrei centrarle sulla cella, per questo aggiungo 0.5 ma non e' generale
-        // e non ho neanche verificato se e' ok in questo caso specifico
+        // FIXME vorrei centrarle sulla cella, per questo aggiungo 0.5 ma non e' generale.
+        // Inoltre non considero il caso di crossing del meridiano 180.
         double radPerXCell = xMetersToRad(cellXSizeInMeters);
-        double radPerYCell = yMetersToRad(cellYSizeInMeters);
-        double latitude = nwLat-(yCell+0.5)*radPerYCell;
         double longitude = nwLng+(xCell+0.5)*radPerXCell;
+        double radPerYCell = yMetersToRad(cellYSizeInMeters) * Math.signum(-nwLat);
+        double latitude = nwLat+(yCell+0.5)*radPerYCell;
         Instance outInstance = new Instance(instance);
-        outInstance.insertAttributeAt(outInstance.numAttributes());
-        outInstance.insertAttributeAt(outInstance.numAttributes());
+        outInstance.insertAttributeAt(cellIdIndex);
+        outInstance.insertAttributeAt(cellIdIndex);
         outInstance.setValue(getOutputFormat().attribute("cellId"), key);
         outInstance.setValue(getOutputFormat().attribute("latitude"), Double.toString(latitude));
         outInstance.setValue(getOutputFormat().attribute("longitude"), Double.toString(longitude));

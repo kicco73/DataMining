@@ -51,7 +51,7 @@ import weka.core.Attribute;
  * @author Filippo Ricci
  * @version $Revision: 5987 $
  */
-public class NormalizeGrid
+public class GridNormalize
         extends PotentialClassIgnorer
         implements UnsupervisedFilter, OptionHandler {
 
@@ -264,6 +264,6 @@ public class NormalizeGrid
      * @param args should contain arguments to the filter, use -h for help
      */
     public static void main(String[] args) {
-        runFilter(new NormalizeGrid(), args);
+        runFilter(new GridNormalize(), args);
     }
 }
