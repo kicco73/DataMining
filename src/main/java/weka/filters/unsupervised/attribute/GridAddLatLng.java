@@ -23,11 +23,8 @@ import weka.core.FastVector;
 
 /**
  * <!-- globalinfo-start -->
- * Normalizes all numeric values in the given dataset (apart from the class
- * attribute, if set). The resulting values are by default in [0,1] for the data
- * used to compute the normalization intervals. But with the scale and
- * translation parameters one can change that, e.g., with scale = 2.0 and
- * translation = -1.0 you get values in the range [-1,+1].
+ * Converts a cellId in the format (lat;lng) in latitude and longitude
+ * attributes. These values are creates as strings types.
  * <p/>
  * <!-- globalinfo-end -->
  *
@@ -35,25 +32,25 @@ import weka.core.FastVector;
  * Valid options are:
  * <p/>
  *
- * <pre> -unset-class-temporarily
- *  Unsets the class index temporarily before the filter is
- *  applied to the data.
- *  (default: no)</pre>
+ * <pre> -nwLat num
+ *  The nw latitude of the grid origin.</pre>
  *
- * <pre> -S <num>
- *  The scaling factor for the output range.
- *  (default: 1.0)</pre>
+ * <pre> -nwLng num
+ *  The nw longitude of the grid origin.</pre>
  *
- * <pre> -T <num>
- *  The translation of the output range.
- *  (default: 0.0)</pre>
+ * <pre> -cellXSizeInMeters
+ *  The parallel direction size in meters of the cell. Default is 100.</pre>
+ *
+ * <pre> -cellYSizeInMeters
+ *  The meridian direction size in meters of the cell. Default is 100.</pre>
  *
  * <!-- options-end -->
- *
+ * 
  * @author Enrico Carniani (enrico.carniani@iit.cnr.it)
  * @author Filippo Ricci
  * @version $Revision: 5987 $
  */
+
 public class GridAddLatLng
         extends PotentialClassIgnorer
         implements UnsupervisedFilter, OptionHandler {
@@ -66,12 +63,10 @@ public class GridAddLatLng
     private int cellIdIndex;
     private double nwLat = 0.0;
     private double nwLng = 0.0;
-    private double seLat = 0.0;
-    private double seLng = 0.0;
     private double cellXSizeInMeters = 100;
     private double cellYSizeInMeters = 100;
 
-    private Pattern pattern = Pattern.compile("\\((\\d+);(\\d+)\\)");
+    private final Pattern pattern = Pattern.compile("\\((\\d+);(\\d+)\\)");
 
     /**
      * Returns a string describing this filter.
@@ -80,12 +75,9 @@ public class GridAddLatLng
      * explorer/experimenter gui
      */
     public String globalInfo() {
-        return "Normalizes all numeric values in the given dataset (apart from the "
-                + "class attribute, if set). The resulting values are normalized by default "
-                + "in [0,1] for the data used to compute the normalization intervals. "
-                + "But with the scale and translation parameters one can change that, "
-                + "e.g., with scale = 2.0 and translation = -1.0 you get values in the "
-                + "range [-1,+1].";
+        return "Converts a cellId in the format (lat;lng) in latitude and "
+                + "longitude attributes. "
+                + "These values are creates as strings types.";
     }
 
     /**
@@ -93,6 +85,7 @@ public class GridAddLatLng
      *
      * @return an enumeration of all the available options.
      */
+    @Override
     public Enumeration listOptions() {
         Vector result = new Vector();
 
@@ -102,44 +95,22 @@ public class GridAddLatLng
         }
 
         result.addElement(new Option(
-                "\tThe scaling factor for the output range.\n"
-                + "\t(default: 1.0)",
-                "S", 1, "-S <num>"));
+                "\tThe north-western latitude of the grid origin.",
+                "nwLat", 1, "-nwLat <num>"));
 
         result.addElement(new Option(
-                "\tThe translation of the output range.\n"
-                + "\t(default: 0.0)",
-                "T", 1, "-T <num>"));
+                "\tThe north-western longitude of the grid origin",
+                "nwLng", 1, "-nwLng <num>"));
 
+        result.addElement(new Option(
+                "\tThe size in meters of a zone (parallel direction). Default is 100.",
+                "cellXSizeInMeters", 1, "-cellXSizeInMeters <num>"));
+        result.addElement(new Option(
+                "\tThe size in meters of a zone (meridian direction). Default is 100.",
+                "cellYSizeInMeters", 1, "-cellYSizeInMeters <num>"));
         return result.elements();
     }
 
-    /**
-     * Parses a given list of options.
-     * <p/>
-     *
-     * <!-- options-start -->
-     * Valid options are:
-     * <p/>
-     *
-     * <pre> -unset-class-temporarily
-     *  Unsets the class index temporarily before the filter is
-     *  applied to the data.
-     *  (default: no)</pre>
-     *
-     * <pre> -S <num>
-     *  The scaling factor for the output range.
-     *  (default: 1.0)</pre>
-     *
-     * <pre> -T <num>
-     *  The translation of the output range.
-     *  (default: 0.0)</pre>
-     *
-     * <!-- options-end -->
-     *
-     * @param options the list of options as an array of strings
-     * @throws Exception if an option is not supported
-     */
     public void setOptions(String[] options) throws Exception {
         if (getInputFormat() != null) {
             setInputFormat(getInputFormat());
@@ -196,25 +167,24 @@ public class GridAddLatLng
         cellIdIndex = instanceInfo.attribute("cellId").index();
         super.setInputFormat(instanceInfo);
         Instances output = new Instances(instanceInfo, instanceInfo.numInstances());
-        Attribute longitude = new Attribute("longitude", (FastVector)null);
-        output.insertAttributeAt(longitude, cellIdIndex+1);
-        Attribute latitude = new Attribute("latitude", (FastVector)null);
-        output.insertAttributeAt(latitude, cellIdIndex+1);
+        Attribute longitude = new Attribute("longitude", (FastVector) null);
+        output.insertAttributeAt(longitude, cellIdIndex + 1);
+        Attribute latitude = new Attribute("latitude", (FastVector) null);
+        output.insertAttributeAt(latitude, cellIdIndex + 1);
         setOutputFormat(output);
         return true;
     }
 
     public static double xMetersToRad(double meters) {
         final double factor = 7.91959594934121e-06;
-        //System.out.println("*** distance in meters: ("+lat1+","+lng1+") - ("+lat2+","+lng2+") = " + Math.sqrt(Math.pow(lat2-lat1, 2)+Math.pow(lng2-lng1, 2))/factor);
         return meters * factor;
     }
 
     public static double yMetersToRad(double meters) {
         final double factor = 7.91959594934121e-06;
-        System.out.println("*** y meters: ("+meters+") = " + meters*factor);
         return meters * factor;
     }
+
     /**
      * Input an instance for filtering. Filter requires all training instances
      * be read before producing output.
@@ -237,9 +207,9 @@ public class GridAddLatLng
         // FIXME vorrei centrarle sulla cella, per questo aggiungo 0.5 ma non e' generale.
         // Inoltre non considero il caso di crossing del meridiano 180.
         double radPerXCell = xMetersToRad(cellXSizeInMeters);
-        double longitude = nwLng+(xCell+0.5)*radPerXCell;
+        double longitude = nwLng + (xCell + 0.5) * radPerXCell;
         double radPerYCell = yMetersToRad(cellYSizeInMeters) * Math.signum(-nwLat);
-        double latitude = nwLat+(yCell+0.5)*radPerYCell;
+        double latitude = nwLat + (yCell + 0.5) * radPerYCell;
         Instance outInstance = new Instance(instance);
         outInstance.insertAttributeAt(cellIdIndex);
         outInstance.insertAttributeAt(cellIdIndex);
@@ -265,11 +235,11 @@ public class GridAddLatLng
         if (getInputFormat() == null) {
             throw new IllegalStateException("No input instance format defined");
         }
-        System.out.println("MapGridToGps(): mapped "+pushed
-                +" instances");
+        System.out.println("GridAddLatLng(): mapped " + pushed
+                + " instances");
         return super.batchFinished();
     }
-    
+
     public double getNwLat() {
         return nwLat;
     }
@@ -286,23 +256,7 @@ public class GridAddLatLng
         this.nwLng = nwLng;
     }
 
-    public double getSeLat() {
-        return seLat;
-    }
-
-    public void setSeLat(double seLat) {
-        this.seLat = seLat;
-    }
-
-    public double getSeLng() {
-        return seLng;
-    }
-
-    public void setSeLng(double seLng) {
-        this.seLng = seLng;
-    }
-
-      public double getCellXSizeInMeters() {
+    public double getCellXSizeInMeters() {
         return cellXSizeInMeters;
     }
 
@@ -318,18 +272,16 @@ public class GridAddLatLng
         this.cellYSizeInMeters = cellYSizeInMeters;
     }
 
-    public void setArea(double minLat, double minLng, double maxLat, double maxLng) {
+    public void setNWLocation(double minLat, double minLng) {
         setNwLat(minLat);
         setNwLng(minLng);
-        setSeLat(maxLat);
-        setSeLng(maxLng);
     }
-    
+
     public void setCell(double nsMeters, double weMeters) {
         setCellXSizeInMeters(nsMeters);
         setCellYSizeInMeters(weMeters);
     }
-    
+
     /**
      * Returns the revision string.
      *

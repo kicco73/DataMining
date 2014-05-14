@@ -29,7 +29,6 @@ import weka.filters.unsupervised.instance.GridGpsArea;
 import weka.filters.unsupervised.instance.RemoveDuplicates;
 
 public class App {
-
     static double nwLat;
     static double seLat;
     static double nwLng;
@@ -131,7 +130,7 @@ public class App {
         return dataSet;
     }
 
-    public static Instances createFeatures(Instances dataSet) throws Exception {
+    public static Instances extractFeatures(Instances dataSet) throws Exception {
         // Crea bin temporali
         MakeBins binMaker = new MakeBins();
         binMaker.setPeriod(MakeBins.Period.LINEAR);
@@ -155,7 +154,7 @@ public class App {
         Instances dataSet = Filter.useFilter(pickUps, joinAndFillMissing);
         // Aggiunge coordinate geografiche
         GridAddLatLng mapGridToGps = new GridAddLatLng();
-        mapGridToGps.setArea(nwLat, nwLng, seLat, seLng);
+        mapGridToGps.setNWLocation(nwLat, nwLng);
         mapGridToGps.setCell(cellXSizeInMeters, cellYSizeInMeters);
         mapGridToGps.setInputFormat(dataSet);
         dataSet = Filter.useFilter(dataSet, mapGridToGps);        
@@ -198,13 +197,13 @@ public class App {
         
         Instances pickUps = loadCsv(pickupsFileName);
         pickUps = cleanData(pickUps);
-        pickUps = createFeatures(pickUps);
+        pickUps = extractFeatures(pickUps);
         
         // Load second set and create conditioned features
         
         Instances dropOffs = loadCsv(dropoffsFileName);
         dropOffs = cleanData(dropOffs);
-        dropOffs = createFeatures(dropOffs);
+        dropOffs = extractFeatures(dropOffs);
 
         // Join features into one bigger set
 
