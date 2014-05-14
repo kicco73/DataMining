@@ -86,12 +86,10 @@ public class MakeBins
 
     private Date minDate;
     private Date maxDate;
-    private int numBins = 1;
-    private long binDuration;
+    private int binsInADay = 1;
 
     public enum Period {
-
-        LINEAR, BY_HOURS_IN_A_DAY, BY_DAY_OF_WEEK, BY_MONTH_OF_YEAR
+        LINEAR, BY_HOURS_IN_A_DAY, BY_WORKING_DAYS, BY_DAY_OF_WEEK
     };
 
     private Period period = Period.LINEAR;
@@ -219,6 +217,22 @@ public class MakeBins
         return false;
     }
 
+    private int getNumBins() {
+        final long oneDay = 86400 * 1000;
+        final long millisInAHour = 1000*60*60;
+        switch(period) {
+            case LINEAR:
+                return (int) ((maxDate.getTime()+oneDay - minDate.getTime())/millisInAHour*binsInADay/24);
+            case BY_DAY_OF_WEEK:
+                return 7 * binsInADay;
+            case BY_WORKING_DAYS:
+                return 2 * binsInADay;
+            case BY_HOURS_IN_A_DAY:
+                return binsInADay;
+        }
+        return 1;
+    }
+    
     /**
      * Input an instance for filtering. Filter requires all training instances
      * be read before producing output.
@@ -235,10 +249,6 @@ public class MakeBins
 
         if (m_NewBatch) {
             resetQueue();
-            final long oneDay = 86400 * 1000;
-            if(period == Period.BY_HOURS_IN_A_DAY)
-                numBins = numBins < 24? numBins : 24;
-            binDuration = (maxDate.getTime() + oneDay - minDate.getTime()) / numBins;
             aggregate = new HashMap<String, int[]>();
             m_NewBatch = false;
         }
@@ -250,16 +260,19 @@ public class MakeBins
         int bin = 0;
         switch (period) {
             case LINEAR:
+                final long oneDay = 86400 * 1000;
+                long binDuration = (maxDate.getTime() + oneDay - minDate.getTime()) / getNumBins();
                 bin = (int) ((gpsDate.getTime() - minDate.getTime()) / binDuration);
                 break;
             case BY_HOURS_IN_A_DAY:
-                bin = gpsDate.getHours() * numBins / 24;
+                bin = gpsDate.getHours() * binsInADay / 24;
                 break;
             case BY_DAY_OF_WEEK:
-                // TODO
+                bin = gpsDate.getDay() * binsInADay + gpsDate.getHours() * binsInADay / 24;
                 break;
-            case BY_MONTH_OF_YEAR:
-                // TODO
+            case BY_WORKING_DAYS:
+                bin = gpsDate.getHours() * binsInADay / 24;
+                bin += gpsDate.getDay() == 0 || gpsDate.getDay() == 6? binsInADay : 0;
                 break;
         }
         return bin;
@@ -274,10 +287,10 @@ public class MakeBins
         try {
             Date gpsDate = format.parse(dateStr);
             int bin = getBinIndex(gpsDate);
-            if (bin >= 0 && bin < numBins) {
+            if (bin >= 0 && bin < getNumBins()) {
                 int[] resultCell = aggregate.get(key);
                 if (resultCell == null) {
-                    resultCell = new int[numBins];
+                    resultCell = new int[getNumBins()];
                     aggregate.put(key, resultCell);
                 }
                 resultCell[bin]++;
@@ -294,16 +307,16 @@ public class MakeBins
         FastVector attributes = new FastVector();
         Attribute cellId = new Attribute("cellId", (FastVector) null);
         attributes.addElement(cellId);
-        for (int i = 0; i < numBins; i++) {
+        for (int i = 0; i < getNumBins(); i++) {
             attributes.addElement(new Attribute("bin" + i));
         }
         Instances dataset = new Instances("grid", attributes, aggregate.size());
         for (String key : aggregate.keySet()) {
             int[] features = aggregate.get(key);
-            Instance instance = new Instance(1 + numBins);
+            Instance instance = new Instance(1 + getNumBins());
             instance.setDataset(dataset);
             instance.setValue(0, key);
-            for (int i = 0; i < numBins; i++) {
+            for (int i = 0; i < getNumBins(); i++) {
                 instance.setValue(i + 1, features[i]);
             }
             dataset.add(instance);
@@ -330,7 +343,7 @@ public class MakeBins
         for(int i = 0; i < instances.numInstances(); i++)
             push(instances.instance(i));
         m_NewBatch = true;
-        System.out.println("MakeBins(): created "+numBins+" time bins");
+        System.out.println("MakeBins(): created "+getNumBins()+" time bins");
         return false;
     }
 
@@ -350,12 +363,12 @@ public class MakeBins
         this.maxDate = maxDate;
     }
 
-    public int getNumBins() {
-        return numBins;
+    public int getBinsInADay() {
+        return binsInADay;
     }
 
-    public void setNumBins(int numBins) {
-        this.numBins = numBins;
+    public void setBinsInADay(int binsInADay) {
+        this.binsInADay = binsInADay;
     }
 
     public Period getPeriod() {

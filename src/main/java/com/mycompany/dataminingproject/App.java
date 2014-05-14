@@ -1,6 +1,7 @@
 package com.mycompany.dataminingproject;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.ParseException;
@@ -35,7 +36,7 @@ public class App {
     static double seLng;
     static double cellXSizeInMeters;
     static double cellYSizeInMeters;
-    static int numBins;
+    static int binsInADay;
     static Date minDate;
     static Date maxDate;
     static String pickupsFileName;
@@ -45,11 +46,10 @@ public class App {
     static int numClusters;
     static MakeBins.Period period;
 
-    private void loadProps(String propertiesName) throws ParseException {
+    private void loadProps(InputStream is) throws ParseException {
         Properties config;
 
         try {
-            InputStream is = getClass().getResourceAsStream(propertiesName);
             config = new Properties();
             config.load(is);
             is.close();
@@ -71,7 +71,7 @@ public class App {
             for(MakeBins.Period p: MakeBins.Period.values()) 
                 if(p.name().equalsIgnoreCase(config.getProperty("makeBins.period")))
                     period = p;
-            numBins = Integer.parseInt(config.getProperty("makeBins.numBins", "1"));
+            binsInADay = Integer.parseInt(config.getProperty("makeBins.binsInADay", "1"));
             numClusters = Integer.parseInt(config.getProperty("numClusters", "3"));
         } catch (ParseException ioe) {
             System.err.println("ParseException in loadProps");
@@ -136,7 +136,7 @@ public class App {
         binMaker.setPeriod(MakeBins.Period.LINEAR);
         binMaker.setMinDate(minDate);
         binMaker.setMaxDate(maxDate);
-        binMaker.setNumBins(numBins);
+        binMaker.setBinsInADay(binsInADay);
         binMaker.setPeriod(period);
         binMaker.setInputFormat(dataSet);
         dataSet = Filter.useFilter(dataSet, binMaker);
@@ -190,8 +190,11 @@ public class App {
         return assignments;
     }
     
-    public void run(String configName) throws Exception {
-        loadProps(configName);
+    public void run(String args[]) throws Exception {
+        InputStream is = args.length == 0?
+                getClass().getResourceAsStream("/resources/config.properties") :
+                new FileInputStream(args[0]);
+        loadProps(is);
 
         // Load first set and create conditioned features
         
@@ -244,7 +247,6 @@ public class App {
 
     public static void main(String[] args) throws Exception {
         App a = new App();
-        String configName = "/resources/config.properties";
-        a.run(configName);
+        a.run(args);
     }
 }
