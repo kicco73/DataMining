@@ -45,6 +45,7 @@ public class App {
     static String arffOutFileName;
     static int numClusters;
     static MakeBins.Period period;
+    static boolean additive;
 
     private void loadProps(InputStream is) throws ParseException {
         Properties config;
@@ -73,6 +74,7 @@ public class App {
                     period = p;
             binsInADay = Integer.parseInt(config.getProperty("makeBins.binsInADay", "1"));
             numClusters = Integer.parseInt(config.getProperty("numClusters", "3"));
+            additive = Boolean.parseBoolean(config.getProperty("gridJoin.additive", "false"));
         } catch (ParseException ioe) {
             System.err.println("ParseException in loadProps");
         } catch (IOException ioe) {
@@ -150,6 +152,7 @@ public class App {
     public static Instances joinFeatures(Instances pickUps, Instances dropOffs) throws Exception {
         GridJoin joinAndFillMissing = new GridJoin();
         joinAndFillMissing.setComplementaryDataSet(dropOffs);
+        joinAndFillMissing.setAdditive(additive);
         joinAndFillMissing.setInputFormat(pickUps);
         Instances dataSet = Filter.useFilter(pickUps, joinAndFillMissing);
         // Aggiunge coordinate geografiche

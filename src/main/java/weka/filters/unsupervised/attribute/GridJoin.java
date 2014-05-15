@@ -64,6 +64,8 @@ public class GridJoin
     static final long serialVersionUID = -8158531150984362900L;
     private Instances complementaryDataSet;
     
+    private boolean additive = false;
+    
     /**
      * Returns a string describing this filter.
      *
@@ -217,7 +219,7 @@ public class GridJoin
         return result;
     }
        
-    private Instances join(Instances firstSet, Instances secondSet) {
+    private Instances joinAdditive(Instances firstSet, Instances secondSet) {
         int missingInSecondSet = 0;
         int missingInFirstSet = 0;
         Map<String, Instance> secondMap = convertToMap(secondSet);
@@ -271,10 +273,53 @@ public class GridJoin
             dataset.add(instance);
             missingInFirstSet++;
         }
-        System.out.println("JoinAndFillMissing(): final samples: "+dataset.numInstances()+"; missing in first set: "+missingInFirstSet+", missing in second set: "+ missingInSecondSet);
+        System.out.println("GridJoin.joinAdditive(): final samples: "+dataset.numInstances()+"; missing in first set: "+missingInFirstSet+", missing in second set: "+ missingInSecondSet);
+        return dataset;
+    }
+    
+    private Instances joinSubtractive(Instances firstSet, Instances secondSet) {
+        int missingInSecondSet = 0;
+        int missingInFirstSet = 0;
+        Map<String, Instance> secondMap = convertToMap(secondSet);
+        FastVector attributes = new FastVector();
+        attributes.addElement(new Attribute("cellId", (FastVector) null));
+        int n = 0;
+        for (int i = 0; i < firstSet.numAttributes(); i++) {
+            if(firstSet.attribute(i).isNumeric()) {
+                attributes.addElement(new Attribute("up" + i));
+                attributes.addElement(new Attribute("dn" + i));
+                n++;
+            }
+        }
+        Instances dataset = new Instances("grid", attributes, firstSet.numInstances());
+        Attribute cellId = firstSet.attribute("cellId");
+
+        for (int j = 0; j < firstSet.numInstances(); j++) {
+            Instance mainInstance = firstSet.instance(j);
+            String key = mainInstance.stringValue(cellId);
+            Instance secondaryInstance = secondMap.get(key);
+            if(secondaryInstance != null) {
+                secondMap.remove(key);
+                Instance instance = new Instance(1 + 2*n);
+                instance.setDataset(dataset);
+                instance.setValue(0, key);
+                int m = 1;
+                for (int i = 0; i < firstSet.numAttributes(); i++) {
+                    if(firstSet.attribute(i).isNumeric()) {
+                        double secondValue = secondaryInstance.value(i);
+                        instance.setValue(m++, mainInstance.value(i));
+                        instance.setValue(m++, secondValue);
+                    }
+                }
+                dataset.add(instance);
+            } else missingInSecondSet++;
+        }
+        missingInFirstSet = secondMap.size();
+        System.out.println("GridJoin.joinSubtractive(): final samples: "+dataset.numInstances()+"; missing in first set: "+missingInFirstSet+", missing in second set: "+ missingInSecondSet);
         return dataset;
     }
 
+    
     
     /**
      * Signify that this batch of input to the filter is finished. If the filter
@@ -291,7 +336,9 @@ public class GridJoin
             throw new IllegalStateException("No input instance format defined");
         }
         
-        Instances instances = join(getInputFormat(), complementaryDataSet);
+        Instances instances = additive?
+                joinAdditive(getInputFormat(), complementaryDataSet) :
+                joinSubtractive(getInputFormat(), complementaryDataSet);
         setOutputFormat(instances);
         for(int i = 0; i < instances.numInstances(); i++)
             push(instances.instance(i));
@@ -308,6 +355,14 @@ public class GridJoin
         this.complementaryDataSet = complementaryDataSet;
     }
 
+    public boolean isAdditive() {
+        return additive;
+    }
+
+    public void setAdditive(boolean additive) {
+        this.additive = additive;
+    }
+    
     /**
      * Returns the revision string.
      *

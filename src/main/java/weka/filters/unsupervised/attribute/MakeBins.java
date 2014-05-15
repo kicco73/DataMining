@@ -343,7 +343,7 @@ public class MakeBins
         for(int i = 0; i < instances.numInstances(); i++)
             push(instances.instance(i));
         m_NewBatch = true;
-        System.out.println("MakeBins(): created "+getNumBins()+" time bins");
+        System.out.println("MakeBins(): created "+getNumBins()+" time bins, pushed "+instances.numInstances()+ " instances");
         return false;
     }
 

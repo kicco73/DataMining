@@ -70,38 +70,14 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
      * for serialization.
      */
     private static final long serialVersionUID = -123123123123123L;
-    /**
-     * True if only count attribute's presence and absence
-     */
-    protected boolean m_binary;
-    /**
-     * Set the range of attributes to be used
-     */
-    protected Range m_Range;
-    /**
-     * True if ignore attributes in the specified range
-     */
-    protected boolean m_invertSelection;
-    /**
-     * The boolean flags, whether an attribute will be used or not.
-     */
-    protected boolean[] m_ActiveIndices;
-    /**
-     * the instances used internally.
-     */
-    protected Instances m_Data;
-    /**
-     * Whether all the necessary preparations have been done.
-     */
-    protected boolean m_Validated;
-    int count=0;
-
+    
     /**
      * Returns a string describing this object.
      *     
 * @return a description of the evaluator suitable for displaying in the
      * explorer/experimenter gui
      */
+    @Override
     public String globalInfo() {
         return "The cosine rule of vector similarity. Take (1 - cosine value) as distance.";
     }
@@ -111,6 +87,7 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
      *     
 * @return the revision
      */
+    @Override
     public String getRevision() {
         return RevisionUtils.extract("$Revision: 5953 $");
     }
@@ -122,19 +99,7 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
      */
     @Override
     public String[] getOptions() {
-        String[] options = new String[4];
-        if (getBinary()) {
-            options[0] = "-B";
-        } else {
-            options[0] = "";
-        }
-        if (getInvertSelection()) {
-            options[1] = "-V";
-        } else {
-            options[1] = "";
-        }
-        options[2] = "-R";
-        options[3] = getAttributeIndices();
+        String[] options = new String[0];
         return options;
     }
 
@@ -146,14 +111,6 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
     @Override
     public Enumeration listOptions() {
         Vector newVector = new Vector();
-        newVector.addElement(new Option(
-                "\tSets whehter count attribute's weight or \n"
-                + "\tits absence or occurrence (binary mode).", "B", 0, "-B"));
-        newVector.addElement(new Option(
-                "\tSets whether the matching sense of attribute \n"
-                + "\tindices is inverted or not.", "V", 0, "-V"));
-        newVector.addElement(new Option("\tSet the range of attributes to be used",
-                "R", 1, "-R"));
         return newVector.elements();
     }
 
@@ -165,212 +122,57 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
      */
     @Override
     public void setOptions(String[] options) throws Exception {
-        setBinary(Utils.getFlag('B', options));
-        setInvertSelection(Utils.getFlag('V', options));
-        setAttributeIndices(Utils.getOption('R', options));
     }
 
+    private double cos(Instance first, Instance second, String prefix) {
+        int classidx = first.classIndex();
+        double similarity = 0.0, cosineDistance, 
+        		product = 0.0, lengthA = 0.0, lengthB = 0.0;
+        
+        for (int v = 0; v < first.numAttributes(); v++) {
+            if (v != classidx && first.attribute(v).isNumeric() && 
+                    first.attribute(v).name().startsWith(prefix)) {                
+                double valueA = first.value(v);
+                double valueB = second.value(v);
+                product += valueA * valueB;
+                lengthA += valueA * valueA;
+                lengthB += valueB * valueB;
+           }
+        }
+        
+        lengthA = Math.sqrt(lengthA);
+        lengthB = Math.sqrt(lengthB);
+
+        if (lengthA == 0) {
+        	System.err.println("*** CosineDistance(): null vector "+prefix+": "+first);
+        	cosineDistance = Double.NaN;
+        } else if (lengthB == 0) {
+        	System.err.println("*** CosineDistance(): null vector "+prefix+": "+second);
+        	cosineDistance = Double.NaN;
+        } else cosineDistance = product / (lengthA * lengthB); 
+        return cosineDistance;
+    }
+    
     /**
      * Calculates the distance between two instances.
      *     
-* @param first the first instance
+     * @param first the first instance
      * @param second the second instance
      * @return the similarity (max of CosineDistance between number of Get-ons vector and number o
      * of Get-offs Vector) between the two given instances
      */
     @Override
     public double distance(Instance first, Instance second) {
-        if (m_Validated == false) {
-            _initializeRanges();
-        }
+
         if (first.equalHeaders(second) == false) {
-            System.err.println("Headers of the two instances doesn't match!!!");
+            System.err.println("Headers of the two instances don't match!");
             return Double.NaN;
         }
         
-        int classidx = first.classIndex();
-        double similarity = 0.0, cosineDistanceON = 0.0, cosineDistanceOFF = 0.0, 
-        		product = 0.0, lengthA = 0.0, lengthB = 0.0, value = 0.0;
-        int idx = 0;
-        
-        // Get the Bins number from the Instance NumAttribTot-NumAttribExtra=2*BinsNumber
-        
-        //int numBins = (first.numAttributes()-3)/2;
-        
-        // Consider ONLY the Get-on Bins
-        
-        for (int v = 0; v < first.numAttributes(); v++) {
-            idx = first.index(v); 				// perchè questa riga ? non è uguale mettere direttamente v ?
-            
-            if (idx == classidx || !first.attributeSparse(v).isNumeric()) {
-            	System.out.println("Attributo non numerico");
-            	   continue; // this condition skip non-right attribute from for-cycle
-            }
-            if ((m_invertSelection && m_ActiveIndices[idx])
-                    || (m_invertSelection == false && m_ActiveIndices[idx] == false)) {
-                continue;
-            }
-            if (m_binary) {
-                ++lengthA;
-                if (second.value(idx) != 0) {
-                    ++product;
-                }
-            } else {
-            	if(first.attribute(v).toString().contains("up")){
-                
-            		value = first.value(v);
-                	product += value * second.value(idx);
-                	lengthA += value * value;
-                	System.out.println("Attributo up OK : "+ v);
-                	}
-            	
-            	else System.out.println("Attributo down non ok : "+ v);continue;
-                                
-            }
-        }
-        
-        // Consider the same Bins in the second Instance to calculate Lenght B // Potrei mettere il calcolo nel ciclo precedente tramite second.value(v)???
-        
-        for (int v = 0; v < second.numAttributes(); v++) {
-            idx = second.index(v);
-            if (idx == classidx || !second.attributeSparse(v).isNumeric()) {
-                continue;
-            }
-            if ((m_invertSelection && m_ActiveIndices[idx])
-                    || (m_invertSelection == false && m_ActiveIndices[idx] == false)) {
-                continue;
-            }
-            if (m_binary) {
-                ++lengthB;
-            } else {
-            	if(second.attribute(v).toString().contains("up")){
-            		
-            		System.out.println("Calcolo LenghtB : "+ v); 
-            		value = second.valueSparse(v);
-                	lengthB += value * value;
-                	
-            	}
-            	 else System.out.println("NON ci siamo: "+ v); continue;
-            }
-        }
-        
-        lengthA = Math.sqrt(lengthA);
-        lengthB = Math.sqrt(lengthB);
+        double cosineDistanceOn = cos(first, second, "up");        
+        double cosineDistanceOff = cos(first, second, "dn");
 
- // THERE ARE empty instances DA GESTIRE !!!  //CONSIDERO PER ADESSO DI PRENDERE L'ALTRA SIMILARITA' CHE SICURAMENTE NON SARA'GENERATA DA VETTORI TUTTI VUOTI
- 
-        if (lengthA == 0 || lengthB == 0) {
-        	System.out.println("EMPTY INSTANCE.");
-        	cosineDistanceON=Double.NEGATIVE_INFINITY;
-            
-        }
-        else cosineDistanceON= product / (lengthA * lengthB); 
-        
- // Cosine Distance for Drop-Off. Reply the previous for-cycle in other bins 
-        
-        for (int v = 0; v < first.numAttributes(); v++) {
-            idx = first.index(v); 
-            
-            similarity = 0.0; cosineDistanceON = 0.0; cosineDistanceOFF = 0.0; 
-            product = 0.0; lengthA = 0.0; lengthB = 0.0; value = 0.0;
-            
-            if (idx == classidx || !first.attributeSparse(v).isNumeric()) {
-            	System.out.println("Attributo non numerico:" + v);
-                continue;
-            }
-            if ((m_invertSelection && m_ActiveIndices[idx])
-                    || (m_invertSelection == false && m_ActiveIndices[idx] == false)) {
-            	 continue;
-            }
-            if (m_binary) {
-                ++lengthA;
-                if (second.value(idx) != 0) {
-                    ++product;
-                }
-            } else {
-            	if(second.attribute(v).toString().contains("dn")){
-                
-            		value = first.value(v);
-            		product += value * second.value(idx);
-            		lengthA += value * value;
-            		System.out.println("Down OK : "+ v);
-            		}
-            	else System.out.println("Up non ok : "+ v); continue;
-                
-            }
-        }
-        for (int v = 0; v < second.numAttributes(); v++) {
-            idx = second.index(v);
-            if (idx == classidx || !second.attributeSparse(v).isNumeric()) {
-                continue;
-            }
-            if ((m_invertSelection && m_ActiveIndices[idx])
-                    || (m_invertSelection == false && m_ActiveIndices[idx] == false)) {
-                continue;
-            }
-            if (m_binary) {
-                ++lengthB;
-            } else {
-            	if(second.attribute(v).toString().contains("dn")){
-                value = second.valueSparse(v);
-                lengthB += value * value;
-                System.out.println("Down lenght : "+ v);
-                }
-            	else System.out.println("up non ok : "+ v); continue;
-            }
-        }
-        
-        lengthA = Math.sqrt(lengthA);
-        lengthB = Math.sqrt(lengthB);
-        
-        if (lengthA == 0 || lengthB == 0) {
-        	System.out.println("EMPTY INSTANCE.");
-        	cosineDistanceON=Double.NEGATIVE_INFINITY;
-            
-        }
-        else cosineDistanceOFF= product / (lengthA * lengthB);
-      
-        
-        similarity = Math.max(cosineDistanceOFF, cosineDistanceON);
-        
-                
-        if (Double.isNaN(similarity)) {
-
-        	// empty instances 
-            
-        	if (lengthA == 0 && lengthB == 0) {
-            	System.out.println("I due vettori di Get-on/Drop-off sono uguali e tutti pieni di zero");  // Zero è diverso da -infinito
-            	return similarity = 1.0;
-            }
-        	
-        	if (lengthA == 0 || lengthB == 0){
-        		System.out.println("I due vettori di Get-on/Drop-off sono sicuramente diversi ed uno è pieno di zeri");  // Zero è diverso da -infinito
-            	return similarity = -1.0;
-        	}
-            /*System.out.println("similarity is NaN, product = " + product
-                    + ", lengthA = " + lengthA + ", lengthB = " + lengthB + "\nfirst: "
-                    + first + "\nsecond: " + second);
-            System.err.println("similarity is NaN, product = " + product
-                    + ", lengthA = " + lengthA + ", lengthB = " + lengthB + "\nfirst: "
-                    + first + "\nsecond: " + second);
-            try {
-                throw new Exception();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-            System.exit(1);
-            return 1; */
-        }
-        if (Double.isInfinite(similarity)) {
-            System.err.println("similarity is Infinite");
-            return 0;
-        }
-        //if (similarity < 0) {
-        //    System.err.println("similarity is minus");
-        //}
-        System.out.println(similarity);
-   
-        return similarity;
+        return Math.max(cosineDistanceOn, cosineDistanceOff);
     }
 
     /**
@@ -432,155 +234,4 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
         return distance;
     }
 
-    /**
-     * Initializes the ranges using all instances of the dataset. Sets m_Ranges.
-     */
-    protected void _initializeRanges() {
-        m_ActiveIndices = new boolean[m_Data.numAttributes()];
-        if (m_Range == null) {
-            for (int i = 0; i < m_ActiveIndices.length; i++) {
-                m_ActiveIndices[i] = true;
-            }
-        } else {
-            m_Range.setUpper(m_Data.numAttributes() - 1);
-            m_Range.setInvert(m_invertSelection);
-            for (int i = 0; i < m_ActiveIndices.length; i++) {
-                m_ActiveIndices[i] = m_Range.isInRange(i);
-            }
-        }
-        m_Validated = true;
-    }
-
-    @Override
-    public void update(Instance ins) {
-    }
-
-    @Override
-    public void postProcessDistances(double[] distances) {
-    }
-
-    /**
-     * Sets the instances.
-     *     
-* @param data the instances to use
-     */
-    @Override
-    public void setInstances(Instances data) {
-        m_Data = data;
-        m_Validated = false;
-    }
-
-    /**
-     * returns the instances currently set.
-     *     
-* @return the current instances
-     */
-    @Override
-    public Instances getInstances() {
-        return m_Data;
-    }
-
-    /**
-     * Gets the range of attributes used in the calculation of the distance.
-     *     
-* @return the attribute index range
-     */
-    public String getAttributeIndices() {
-        if (m_Range == null) {
-            return "first-last";
-        }
-        return m_Range.getRanges();
-    }
-
-    /**
-     * Sets the range of attributes to use in the calculation of the distance.
-     * The indices start from 1, 'first' and 'last' are valid as well. E.g.:
-     * first-3,5,6-last
-     *     
-* @param value the new attribute index range
-     */
-    @Override
-    public void setAttributeIndices(String value) {
-        if (value.length() != 0) {
-            if (m_Range.equals("first-last") == false) {
-                m_Range = new Range(value);
-            }
-            m_Validated = false;
-        }
-    }
-
-    /**
-     * Returns the tip text for this property.
-     *     
-* @return tip text for this property suitable for displaying in the
-     * explorer/experimenter gui
-     */
-    public String attributeIndicesTipText() {
-        return "Specify range of attributes to act on. "
-                + "This is a comma separated list of attribute indices, with "
-                + "\"first\" and \"last\" valid values. Specify an inclusive "
-                + "range with \"-\". E.g: \"first-3,5,6-10,last\".";
-    }
-
-    /**
-     * Gets the range of attributes used in the calculation of the distance.
-     *     
-* @return the attribute index range
-     */
-    public boolean getInvertSelection() {
-        return m_invertSelection;
-    }
-
-    /**
-     * Sets whether the matching sense of attribute indices is inverted or not.
-     *     
-* @param value if true the matching sense is inverted
-     */
-    public void setInvertSelection(boolean value) {
-        m_invertSelection = value;
-        m_Validated = false;
-    }
-
-    /**
-     * Returns the tip text for this property.
-     *     
-* @return tip text for this property suitable for displaying in the
-     * explorer/experimenter gui
-     */
-    public String invertSelectionTipText() {
-        return "Set attribute selection mode. If false, only selected "
-                + "attributes in the range will be used in the distance calculation; if "
-                + "true, only non-selected attributes will be used for the calculation.";
-    }
-
-    /**
-     * Sets whether only counts an attribute's presence and absence, instead of
-     * its frequency.
-     *     
-* @param binary if true the frequencies are not counted
-     */
-    public void setBinary(boolean binary) {
-        m_binary = binary;
-    }
-
-    /**
-     * Gets whether only attribute's presence and absence is counted. (default
-     * false i.e. attribute frequencies are counted.)
-     *     
-* @return true if only binary values are used
-     */
-    public boolean getBinary() {
-        return m_binary;
-    }
-
-    /**
-     * Returns the tip text for this property.
-     *     
-* @return tip text for this property suitable for displaying in the
-     * explorer/experimenter gui
-     */
-    public String binaryTipText() {
-        return "Set to use binary presence and absence of attribute values instead of their "
-                + "frequencies. If true, attribute weights are ignored.";
-    }
 }
