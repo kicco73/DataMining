@@ -1,9 +1,16 @@
 package weka.core;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Vector;
+
+import weka.core.neighboursearch.CoverTree.CoverTreeNode;
 import weka.core.neighboursearch.PerformanceStats;
+import weka.filters.unsupervised.attribute.MakeBins;
 
 /**
  * <!-- globalinfo-start --> Implements the Cosine distance. The distance
@@ -55,10 +62,11 @@ import weka.core.neighboursearch.PerformanceStats;
 * @author Anna Huang (lh92 at waikato dot ac dot nz)
  * @version $Revision: 5953 $
  */
+
 public class CosineDistance extends EuclideanDistance implements DistanceFunction, Serializable,
         RevisionHandler {
 
-    /**
+	 /**
      * for serialization.
      */
     private static final long serialVersionUID = -123123123123123L;
@@ -86,6 +94,7 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
      * Whether all the necessary preparations have been done.
      */
     protected boolean m_Validated;
+    int count=0;
 
     /**
      * Returns a string describing this object.
@@ -166,7 +175,8 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
      *     
 * @param first the first instance
      * @param second the second instance
-     * @return the distance between the two given instances
+     * @return the similarity (max of CosineDistance between number of Get-ons vector and number o
+     * of Get-offs Vector) between the two given instances
      */
     @Override
     public double distance(Instance first, Instance second) {
@@ -177,13 +187,24 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
             System.err.println("Headers of the two instances doesn't match!!!");
             return Double.NaN;
         }
+        
         int classidx = first.classIndex();
-        double similarity = 0.0, product = 0.0, lengthA = 0.0, lengthB = 0.0, value = 0.0;
+        double similarity = 0.0, cosineDistanceON = 0.0, cosineDistanceOFF = 0.0, 
+        		product = 0.0, lengthA = 0.0, lengthB = 0.0, value = 0.0;
         int idx = 0;
-        for (int v = 0; v < first.numValues(); v++) {
-            idx = first.index(v);
+        
+        // Get the Bins number from the Instance NumAttribTot-NumAttribExtra=2*BinsNumber
+        
+        //int numBins = (first.numAttributes()-3)/2;
+        
+        // Consider ONLY the Get-on Bins
+        
+        for (int v = 0; v < first.numAttributes(); v++) {
+            idx = first.index(v); 				// perchè questa riga ? non è uguale mettere direttamente v ?
+            
             if (idx == classidx || !first.attributeSparse(v).isNumeric()) {
-                continue;
+            	System.out.println("Attributo non numerico");
+            	   continue; // this condition skip non-right attribute from for-cycle
             }
             if ((m_invertSelection && m_ActiveIndices[idx])
                     || (m_invertSelection == false && m_ActiveIndices[idx] == false)) {
@@ -195,12 +216,22 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
                     ++product;
                 }
             } else {
-                value = first.valueSparse(v);
-                product += value * second.value(idx);
-                lengthA += value * value;
+            	if(first.attribute(v).toString().contains("up")){
+                
+            		value = first.value(v);
+                	product += value * second.value(idx);
+                	lengthA += value * value;
+                	System.out.println("Attributo up OK : "+ v);
+                	}
+            	
+            	else System.out.println("Attributo down non ok : "+ v);continue;
+                                
             }
         }
-        for (int v = 0; v < second.numValues(); v++) {
+        
+        // Consider the same Bins in the second Instance to calculate Lenght B // Potrei mettere il calcolo nel ciclo precedente tramite second.value(v)???
+        
+        for (int v = 0; v < second.numAttributes(); v++) {
             idx = second.index(v);
             if (idx == classidx || !second.attributeSparse(v).isNumeric()) {
                 continue;
@@ -212,23 +243,111 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
             if (m_binary) {
                 ++lengthB;
             } else {
-                value = second.valueSparse(v);
-                lengthB += value * value;
+            	if(second.attribute(v).toString().contains("up")){
+            		
+            		System.out.println("Calcolo LenghtB : "+ v); 
+            		value = second.valueSparse(v);
+                	lengthB += value * value;
+                	
+            	}
+            	 else System.out.println("NON ci siamo: "+ v); continue;
             }
         }
+        
         lengthA = Math.sqrt(lengthA);
         lengthB = Math.sqrt(lengthB);
-// empty instances
+
+ // THERE ARE empty instances DA GESTIRE !!!  //CONSIDERO PER ADESSO DI PRENDERE L'ALTRA SIMILARITA' CHE SICURAMENTE NON SARA'GENERATA DA VETTORI TUTTI VUOTI
+ 
         if (lengthA == 0 || lengthB == 0) {
-            return 1.0;
+        	System.out.println("EMPTY INSTANCE.");
+        	cosineDistanceON=Double.NEGATIVE_INFINITY;
+            
         }
-        similarity = product / (lengthA * lengthB);
-        if (Double.isNaN(similarity)) {
-// empty instances
-            if (lengthA == 0 || lengthB == 0) {
-                return 1.0;
+        else cosineDistanceON= product / (lengthA * lengthB); 
+        
+ // Cosine Distance for Drop-Off. Reply the previous for-cycle in other bins 
+        
+        for (int v = 0; v < first.numAttributes(); v++) {
+            idx = first.index(v); 
+            
+            similarity = 0.0; cosineDistanceON = 0.0; cosineDistanceOFF = 0.0; 
+            product = 0.0; lengthA = 0.0; lengthB = 0.0; value = 0.0;
+            
+            if (idx == classidx || !first.attributeSparse(v).isNumeric()) {
+            	System.out.println("Attributo non numerico:" + v);
+                continue;
             }
-            System.out.println("similarity is NaN, product = " + product
+            if ((m_invertSelection && m_ActiveIndices[idx])
+                    || (m_invertSelection == false && m_ActiveIndices[idx] == false)) {
+            	 continue;
+            }
+            if (m_binary) {
+                ++lengthA;
+                if (second.value(idx) != 0) {
+                    ++product;
+                }
+            } else {
+            	if(second.attribute(v).toString().contains("dn")){
+                
+            		value = first.value(v);
+            		product += value * second.value(idx);
+            		lengthA += value * value;
+            		System.out.println("Down OK : "+ v);
+            		}
+            	else System.out.println("Up non ok : "+ v); continue;
+                
+            }
+        }
+        for (int v = 0; v < second.numAttributes(); v++) {
+            idx = second.index(v);
+            if (idx == classidx || !second.attributeSparse(v).isNumeric()) {
+                continue;
+            }
+            if ((m_invertSelection && m_ActiveIndices[idx])
+                    || (m_invertSelection == false && m_ActiveIndices[idx] == false)) {
+                continue;
+            }
+            if (m_binary) {
+                ++lengthB;
+            } else {
+            	if(second.attribute(v).toString().contains("dn")){
+                value = second.valueSparse(v);
+                lengthB += value * value;
+                System.out.println("Down lenght : "+ v);
+                }
+            	else System.out.println("up non ok : "+ v); continue;
+            }
+        }
+        
+        lengthA = Math.sqrt(lengthA);
+        lengthB = Math.sqrt(lengthB);
+        
+        if (lengthA == 0 || lengthB == 0) {
+        	System.out.println("EMPTY INSTANCE.");
+        	cosineDistanceON=Double.NEGATIVE_INFINITY;
+            
+        }
+        else cosineDistanceOFF= product / (lengthA * lengthB);
+      
+        
+        similarity = Math.max(cosineDistanceOFF, cosineDistanceON);
+        
+                
+        if (Double.isNaN(similarity)) {
+
+        	// empty instances 
+            
+        	if (lengthA == 0 && lengthB == 0) {
+            	System.out.println("I due vettori di Get-on/Drop-off sono uguali e tutti pieni di zero");  // Zero è diverso da -infinito
+            	return similarity = 1.0;
+            }
+        	
+        	if (lengthA == 0 || lengthB == 0){
+        		System.out.println("I due vettori di Get-on/Drop-off sono sicuramente diversi ed uno è pieno di zeri");  // Zero è diverso da -infinito
+            	return similarity = -1.0;
+        	}
+            /*System.out.println("similarity is NaN, product = " + product
                     + ", lengthA = " + lengthA + ", lengthB = " + lengthB + "\nfirst: "
                     + first + "\nsecond: " + second);
             System.err.println("similarity is NaN, product = " + product
@@ -240,16 +359,18 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
                 e.printStackTrace();
             }
             System.exit(1);
-            return 1;
+            return 1; */
         }
         if (Double.isInfinite(similarity)) {
             System.err.println("similarity is Infinite");
             return 0;
         }
-        if (similarity < 0) {
-            System.err.println("similarity is minus");
-        }
-        return 1 - similarity;
+        //if (similarity < 0) {
+        //    System.err.println("similarity is minus");
+        //}
+        System.out.println(similarity);
+   
+        return similarity;
     }
 
     /**
