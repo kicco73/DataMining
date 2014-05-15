@@ -126,8 +126,7 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
 
     private double cos(Instance first, Instance second, String prefix) {
         int classidx = first.classIndex();
-        double similarity = 0.0, cosineDistance, 
-        		product = 0.0, lengthA = 0.0, lengthB = 0.0;
+        double similarity = 0.0, product = 0.0, lengthA = 0.0, lengthB = 0.0;
         
         for (int v = 0; v < first.numAttributes(); v++) {
             if (v != classidx && first.attribute(v).isNumeric() && 
@@ -140,17 +139,14 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
            }
         }
         
-        lengthA = Math.sqrt(lengthA);
-        lengthB = Math.sqrt(lengthB);
-
         if (lengthA == 0) {
         	System.err.println("*** CosineDistance(): null vector "+prefix+": "+first);
-        	cosineDistance = Double.NaN;
+        	similarity = Double.NaN;
         } else if (lengthB == 0) {
         	System.err.println("*** CosineDistance(): null vector "+prefix+": "+second);
-        	cosineDistance = Double.NaN;
-        } else cosineDistance = product / (lengthA * lengthB); 
-        return cosineDistance;
+        	similarity = Double.NaN;
+        } else similarity = product / (Math.sqrt(lengthA) * Math.sqrt(lengthB)); 
+        return similarity;
     }
     
     /**
@@ -169,8 +165,8 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
             return Double.NaN;
         }
         
-        double cosineDistanceOn = cos(first, second, "up");        
-        double cosineDistanceOff = cos(first, second, "dn");
+        double cosineDistanceOn = 1-cos(first, second, "up");        
+        double cosineDistanceOff = 1-cos(first, second, "dn");
 
         return Math.max(cosineDistanceOn, cosineDistanceOff);
     }
