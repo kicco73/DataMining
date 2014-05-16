@@ -128,7 +128,6 @@ public class App {
         removeFilter.setAttributeIndicesArray(removeIndices);
         removeFilter.setInputFormat(dataSet);
         dataSet = Filter.useFilter(dataSet, removeFilter);
-        
         return dataSet;
     }
 
@@ -218,27 +217,35 @@ public class App {
         // Clustering with different algorithms and distance functions
         
         int kMeansAssignments[] = kMeans(new EuclideanDistance(), finalFeatures);
-        int kMeansCosineAssignments[] = kMeans(new CosineDistance(), finalFeatures);
+        int kMeansCosineAssignments[] = null;
         int agglomerativeAssignments[] = agglomerative(new EuclideanDistance(), finalFeatures);
-        int agglomerativeCosineAssignments[] = agglomerative(new CosineDistance(), finalFeatures);
+        int agglomerativeCosineAssignments[] = null;
         
         // Add clustering results to dataset
         
         Attribute kMeansClusterId = new Attribute("kMeansEuclidean", 0);
         finalFeatures.insertAttributeAt(kMeansClusterId, 0);
-        Attribute kMeansCosineClusterId = new Attribute("kMeansCosine", 1);
-        finalFeatures.insertAttributeAt(kMeansCosineClusterId, 1);
-        Attribute agglomerativeId = new Attribute("agglomerativeEuclidean", 2);
-        finalFeatures.insertAttributeAt(agglomerativeId, 2);
-        Attribute agglomerativeCosineId = new Attribute("agglomerativeCosine", 3);
-        finalFeatures.insertAttributeAt(agglomerativeCosineId, 3);
-
+        Attribute agglomerativeId = new Attribute("agglomerativeEuclidean", 1);
+        finalFeatures.insertAttributeAt(agglomerativeId, 1);
+        Attribute kMeansCosineClusterId = null;
+        Attribute agglomerativeCosineId = null;
+        
+        if(!additive) {
+            kMeansCosineClusterId = new Attribute("kMeansCosine", 2);
+            finalFeatures.insertAttributeAt(kMeansCosineClusterId, 2);
+            agglomerativeCosineId = new Attribute("agglomerativeCosine", 3);
+            finalFeatures.insertAttributeAt(agglomerativeCosineId, 3);
+            kMeansCosineAssignments = kMeans(new CosineDistance(), finalFeatures);
+            agglomerativeCosineAssignments = agglomerative(new CosineDistance(), finalFeatures);
+        }
         for(int i = 0; i < finalFeatures.numInstances(); i++) {
             Instance instance = finalFeatures.instance(i);
             instance.setValue(kMeansClusterId, kMeansAssignments[i]);
-            instance.setValue(kMeansCosineClusterId, kMeansCosineAssignments[i]);
             instance.setValue(agglomerativeId, agglomerativeAssignments[i]);
-            instance.setValue(agglomerativeCosineId, agglomerativeCosineAssignments[i]);
+            if(!additive) {
+                instance.setValue(kMeansCosineClusterId, kMeansCosineAssignments[i]);
+                instance.setValue(agglomerativeCosineId, agglomerativeCosineAssignments[i]);
+            }
         }
         
         // Export to filesystem

@@ -145,7 +145,7 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
         } else if (lengthB == 0) {
         	System.err.println("*** CosineDistance(): null vector "+prefix+": "+second);
         	similarity = Double.NaN;
-        } else similarity = product / (Math.sqrt(lengthA) * Math.sqrt(lengthB)); 
+        } else similarity = product / (Math.sqrt(lengthA * lengthB)); 
         return similarity;
     }
     

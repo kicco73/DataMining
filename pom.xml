@@ -15,11 +15,11 @@
   </properties>
 
   <dependencies>
-      <dependency>
+    <dependency>
 	<groupId>nz.ac.waikato.cms.weka</groupId>
 	<artifactId>weka-stable</artifactId>
 	<version>3.6.10</version>
-</dependency>
+    </dependency>
             
     <dependency>
       <groupId>junit</groupId>
