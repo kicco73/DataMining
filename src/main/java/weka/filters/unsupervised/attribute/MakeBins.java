@@ -1,13 +1,7 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package weka.filters.unsupervised.attribute;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.Date;
 import weka.core.Capabilities;
 import weka.core.Instance;
@@ -15,8 +9,6 @@ import weka.core.Instances;
 import weka.core.Option;
 import weka.core.OptionHandler;
 import weka.core.RevisionUtils;
-import weka.core.SparseInstance;
-import weka.core.Utils;
 import weka.core.Capabilities.Capability;
 import weka.filters.UnsupervisedFilter;
 
@@ -29,36 +21,15 @@ import weka.core.FastVector;
 
 /**
  * <!-- globalinfo-start -->
- * Normalizes all numeric values in the given dataset (apart from the class
- * attribute, if set). The resulting values are by default in [0,1] for the data
- * used to compute the normalization intervals. But with the scale and
- * translation parameters one can change that, e.g., with scale = 2.0 and
- * translation = -1.0 you get values in the range [-1,+1].
  * <p/>
  * <!-- globalinfo-end -->
  *
  * <!-- options-start -->
- * Valid options are:
- * <p/>
- *
- * <pre> -unset-class-temporarily
- *  Unsets the class index temporarily before the filter is
- *  applied to the data.
- *  (default: no)</pre>
- *
- * <pre> -S <num>
- *  The scaling factor for the output range.
- *  (default: 1.0)</pre>
- *
- * <pre> -T <num>
- *  The translation of the output range.
- *  (default: 0.0)</pre>
- *
  * <!-- options-end -->
  *
  * @author Enrico Carniani (enrico.carniani@iit.cnr.it)
  * @author Filippo Ricci
- * @version $Revision: 5987 $
+ * @version $Revision: $
  */
 public class MakeBins
         extends PotentialClassIgnorer
@@ -93,7 +64,7 @@ public class MakeBins
     };
 
     private Period period = Period.LINEAR;
-    private SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+    private final SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
     private Map<String, int[]> aggregate;
 
     /**
@@ -123,69 +94,12 @@ public class MakeBins
     }
 
     /**
-     * Parses a given list of options.
-     * <p/>
-     *
-     * <!-- options-start -->
-     * Valid options are:
-     * <p/>
-     *
-     * <pre> -unset-class-temporarily
-     *  Unsets the class index temporarily before the filter is
-     *  applied to the data.
-     *  (default: no)</pre>
-     *
-     * <pre> -S <num>
-     *  The scaling factor for the output range.
-     *  (default: 1.0)</pre>
-     *
-     * <pre> -T <num>
-     *  The translation of the output range.
-     *  (default: 0.0)</pre>
-     *
-     * <!-- options-end -->
-     *
-     * @param options the list of options as an array of strings
-     * @throws Exception if an option is not supported
-     */
-    public void setOptions(String[] options) throws Exception {
-        String tmpStr;
-
-        tmpStr = Utils.getOption('S', options);
-        if (tmpStr.length() != 0) {
-        } else {
-        }
-
-        if (getInputFormat() != null) {
-            setInputFormat(getInputFormat());
-        }
-    }
-
-    /**
-     * Gets the current settings of the filter.
-     *
-     * @return an array of strings suitable for passing to setOptions
-     */
-    public String[] getOptions() {
-        Vector<String> result;
-
-        result = new Vector<String>();
-
-        result.add("-S");
-        result.add("");
-
-        result.add("-T");
-        result.add("");
-
-        return result.toArray(new String[result.size()]);
-    }
-
-    /**
      * Returns the Capabilities of this filter.
      *
      * @return the capabilities of this object
      * @see Capabilities
      */
+    @Override
     public Capabilities getCapabilities() {
         Capabilities result = super.getCapabilities();
         result.disableAll();
@@ -242,6 +156,7 @@ public class MakeBins
      * @throws Exception if an error occurs
      * @throws IllegalStateException if no input format has been set.
      */
+    @Override
     public boolean input(Instance instance) throws Exception {
         if (getInputFormat() == null) {
             throw new IllegalStateException("No input instance format defined");
@@ -385,7 +300,7 @@ public class MakeBins
      * @return the revision
      */
     public String getRevision() {
-        return RevisionUtils.extract("$Revision: 5987 $");
+        return RevisionUtils.extract("$Revision: $");
     }
 
     /**

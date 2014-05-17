@@ -1,16 +1,10 @@
 package weka.core;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Vector;
 
-import weka.core.neighboursearch.CoverTree.CoverTreeNode;
 import weka.core.neighboursearch.PerformanceStats;
-import weka.filters.unsupervised.attribute.MakeBins;
 
 /**
  * <!-- globalinfo-start --> Implements the Cosine distance. The distance
@@ -24,43 +18,10 @@ import weka.filters.unsupervised.attribute.MakeBins;
  * <p/>
  * <!-- globalinfo-end -->
  *
- * <!-- technical-bibtex-start --> BibTeX:
  * 
-* <pre>
- * &#064;misc{missing_id,
- * author = {Wikipedia},
- * title = {Cosine similarity},
- * URL = {http://en.wikipedia.org/wiki/Cosine_similarity}
- * }
- * </pre>
- * <p/>
- * <!-- technical-bibtex-end -->
- *
- * <!-- options-start --> Valid options are:
- * <p/>
- *
- * <pre>
- * -B
- * Turns on using binary presence and absence of attribute
- * values instead of their frequencies in distance calculation.
- * </pre>
- * 
-* <pre>
- * -R &lt;col1,col2-col4,...&gt;
- * Specifies list of columns to used in the calculation of the
- * distance. 'first' and 'last' are valid indices.
- * (default: first-last)
- * </pre>
- * 
-* <pre>
- * -V
- * Invert matching sense of column indices.
- * </pre>
- * 
-* <!-- options-end -->
- * 
-* @author Anna Huang (lh92 at waikato dot ac dot nz)
- * @version $Revision: 5953 $
+*  @author Enrico Carniani
+*  @author Filippo Ricci
+ * @version $Revision: $
  */
 
 public class CosineDistance extends EuclideanDistance implements DistanceFunction, Serializable,
@@ -70,16 +31,17 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
      * for serialization.
      */
     private static final long serialVersionUID = -123123123123123L;
+    private boolean splitMax = false;
     
     /**
      * Returns a string describing this object.
      *     
-* @return a description of the evaluator suitable for displaying in the
+    * @return a description of the evaluator suitable for displaying in the
      * explorer/experimenter gui
      */
     @Override
     public String globalInfo() {
-        return "The cosine rule of vector similarity. Take (1 - cosine value) as distance.";
+        return "The cosine rule of vector distance.";
     }
 
     /**
@@ -89,7 +51,7 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
      */
     @Override
     public String getRevision() {
-        return RevisionUtils.extract("$Revision: 5953 $");
+        return RevisionUtils.extract("$Revision: $");
     }
 
     /**
@@ -117,7 +79,7 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
     /**
      * Parses a given list of options.
      *     
-* @param options the list of options as an array of strings
+     * @param options the list of options as an array of strings
      * @throws Exception if an option is not supported
      */
     @Override
@@ -129,8 +91,8 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
         double similarity = 0.0, product = 0.0, lengthA = 0.0, lengthB = 0.0;
         
         for (int v = 0; v < first.numAttributes(); v++) {
-            if (v != classidx && first.attribute(v).isNumeric() && 
-                    first.attribute(v).name().startsWith(prefix)) {                
+            if (v != classidx && first.attribute(v).isNumeric() && (prefix == null 
+                    || first.attribute(v).name().startsWith(prefix))) {                
                 double valueA = first.value(v);
                 double valueB = second.value(v);
                 product += valueA * valueB;
@@ -164,13 +126,22 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
             System.err.println("Headers of the two instances don't match!");
             return Double.NaN;
         }
-        
-        double cosineDistanceOn = 1-cos(first, second, "up");        
-        double cosineDistanceOff = 1-cos(first, second, "dn");
-
-        return Math.max(cosineDistanceOn, cosineDistanceOff);
+        if(splitMax) {
+            double cosineDistanceOn = 1-cos(first, second, "up");        
+            double cosineDistanceOff = 1-cos(first, second, "dn");
+            return Math.max(cosineDistanceOn, cosineDistanceOff);
+        }
+        return 1-cos(first, second, null);
     }
 
+    public boolean isSplitMax() {
+        return splitMax;
+    }
+
+    public void setSplitMax(boolean splitMax) {
+        this.splitMax = splitMax;
+    }
+    
     /**
      * Calculates the distance between two instances.
      *     
@@ -191,7 +162,7 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
      * distance function class, post processing of the distances by
      * postProcessDistances(double []) may be required if this function is used.
      *     
-* @param first the first instance
+     * @param first the first instance
      * @param second the second instance
      * @param cutOffValue If the distance being calculated becomes larger than
      * cutOffValue then the rest of the calculation is discarded.
@@ -211,7 +182,7 @@ public class CosineDistance extends EuclideanDistance implements DistanceFunctio
      * distance function class, post processing of the distances by
      * postProcessDistances(double []) may be required if this function is used.
      *     
-* @param first the first instance
+     * @param first the first instance
      * @param second the second instance
      * @param cutOffValue If the distance being calculated becomes larger than
      * cutOffValue then the rest of the calculation is discarded.

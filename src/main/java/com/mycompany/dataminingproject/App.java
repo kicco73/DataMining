@@ -41,6 +41,9 @@ public class App {
     static Date maxDate;
     static String pickupsFileName;
     static String dropoffsFileName;
+    static String csvOutCleanPickUpFileName;
+    static String csvOutCleanDropOffFileName;
+    static String csvOutExtractFileName;
     static String csvOutFileName;
     static String arffOutFileName;
     static int numClusters;
@@ -59,6 +62,9 @@ public class App {
             dropoffsFileName = getClass().getResource("/resources/"+config.getProperty("dropoffsFileName")).getFile();
             csvOutFileName = config.getProperty("csvOutFileName");
             arffOutFileName = config.getProperty("arffOutFileName");
+            csvOutCleanPickUpFileName = config.getProperty("csvOutCleanPickUpFileName");
+            csvOutCleanDropOffFileName = config.getProperty("csvOutCleanDropOffFileName");
+            csvOutExtractFileName = config.getProperty("csvOutExtractFileName");
 
             nwLat = Double.parseDouble(config.getProperty("gridGpsArea.nwLat"));
             nwLng = Double.parseDouble(config.getProperty("gridGpsArea.nwLng"));
@@ -134,7 +140,6 @@ public class App {
     public static Instances extractFeatures(Instances dataSet) throws Exception {
         // Crea bin temporali
         MakeBins binMaker = new MakeBins();
-        binMaker.setPeriod(MakeBins.Period.LINEAR);
         binMaker.setMinDate(minDate);
         binMaker.setMaxDate(maxDate);
         binMaker.setBinsInADay(binsInADay);
@@ -192,34 +197,32 @@ public class App {
         return assignments;
     }
     
-    public void run(String args[]) throws Exception {
-        InputStream is = args.length == 0?
-                getClass().getResourceAsStream("/resources/config.properties") :
-                new FileInputStream(args[0]);
-        loadProps(is);
-
+    public void process() throws Exception {
         // Load first set and create conditioned features
         
         Instances pickUps = loadCsv(pickupsFileName);
         pickUps = cleanData(pickUps);
+        saveCsv(csvOutCleanPickUpFileName, pickUps);
         pickUps = extractFeatures(pickUps);
         
         // Load second set and create conditioned features
         
         Instances dropOffs = loadCsv(dropoffsFileName);
         dropOffs = cleanData(dropOffs);
+        saveCsv(csvOutCleanDropOffFileName, dropOffs);
         dropOffs = extractFeatures(dropOffs);
 
         // Join features into one bigger set
 
         Instances finalFeatures = joinFeatures(pickUps, dropOffs);
+        saveCsv(csvOutExtractFileName, finalFeatures);
 
         // Clustering with different algorithms and distance functions
         
         int kMeansAssignments[] = kMeans(new EuclideanDistance(), finalFeatures);
-        int kMeansCosineAssignments[] = null;
+        int kMeansCosineAssignments[] = kMeans(new CosineDistance(), finalFeatures);
         int agglomerativeAssignments[] = agglomerative(new EuclideanDistance(), finalFeatures);
-        int agglomerativeCosineAssignments[] = null;
+        int agglomerativeCosineAssignments[] = agglomerative(new CosineDistance(), finalFeatures);
         
         // Add clustering results to dataset
         
@@ -227,32 +230,38 @@ public class App {
         finalFeatures.insertAttributeAt(kMeansClusterId, 0);
         Attribute agglomerativeId = new Attribute("agglomerativeEuclidean", 1);
         finalFeatures.insertAttributeAt(agglomerativeId, 1);
-        Attribute kMeansCosineClusterId = null;
-        Attribute agglomerativeCosineId = null;
-        
-        if(!additive) {
-            kMeansCosineClusterId = new Attribute("kMeansCosine", 2);
-            finalFeatures.insertAttributeAt(kMeansCosineClusterId, 2);
-            agglomerativeCosineId = new Attribute("agglomerativeCosine", 3);
-            finalFeatures.insertAttributeAt(agglomerativeCosineId, 3);
-            kMeansCosineAssignments = kMeans(new CosineDistance(), finalFeatures);
-            agglomerativeCosineAssignments = agglomerative(new CosineDistance(), finalFeatures);
-        }
+        Attribute kMeansCosineClusterId = new Attribute("kMeansCosine", 2);
+        finalFeatures.insertAttributeAt(kMeansCosineClusterId, 2);
+        Attribute agglomerativeCosineId = new Attribute("agglomerativeCosine", 3);
+        finalFeatures.insertAttributeAt(agglomerativeCosineId, 3);
         for(int i = 0; i < finalFeatures.numInstances(); i++) {
             Instance instance = finalFeatures.instance(i);
             instance.setValue(kMeansClusterId, kMeansAssignments[i]);
             instance.setValue(agglomerativeId, agglomerativeAssignments[i]);
-            if(!additive) {
-                instance.setValue(kMeansCosineClusterId, kMeansCosineAssignments[i]);
-                instance.setValue(agglomerativeCosineId, agglomerativeCosineAssignments[i]);
-            }
+            instance.setValue(kMeansCosineClusterId, kMeansCosineAssignments[i]);
+            instance.setValue(agglomerativeCosineId, agglomerativeCosineAssignments[i]);
         }
         
         // Export to filesystem
 
         saveCsv(csvOutFileName, finalFeatures);
         saveArff(arffOutFileName, finalFeatures);
+    }
+
+    public void run(String args[]) throws Exception {
         
+        if(args.length == 0) {
+            InputStream is = getClass().getResourceAsStream("/resources/firstRun.properties");
+            loadProps(is);
+            process();
+            is = getClass().getResourceAsStream("/resources/secondRun.properties");
+            loadProps(is);
+            process();
+        } else {
+            InputStream is = new FileInputStream(args[0]);
+            loadProps(is);
+            process();
+        }
     }
 
     public static void main(String[] args) throws Exception {
