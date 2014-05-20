@@ -8,6 +8,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Properties;
+import weka.clusterers.ClusterEvaluation;
 import weka.core.CosineDistance;
 import weka.clusterers.HierarchicalClusterer;
 import weka.clusterers.SimpleKMeans;
@@ -182,6 +183,10 @@ public class App {
         simpleKMeans.setDistanceFunction(df);
         simpleKMeans.setPreserveInstancesOrder(true);
         simpleKMeans.buildClusterer(finalFeatures);
+        ClusterEvaluation ce = new ClusterEvaluation();
+        ce.setClusterer(simpleKMeans);
+        ce.evaluateClusterer(new Instances(finalFeatures));
+        System.out.println(ce.clusterResultsToString());
         return simpleKMeans.getAssignments();
     }
     
@@ -191,6 +196,11 @@ public class App {
         clusterer.setNumClusters(numClusters);
         clusterer.setDistanceFunction(df);
         clusterer.buildClusterer(finalFeatures);
+        ClusterEvaluation ce = new ClusterEvaluation();
+        ce.setClusterer(clusterer);
+        ce.evaluateClusterer(new Instances(finalFeatures));
+        System.out.println(ce.clusterResultsToString());
+
         int [] assignments = new int[finalFeatures.numInstances()];
         for(int i = 0; i < finalFeatures.numInstances(); i++)
             assignments[i] = clusterer.clusterInstance(finalFeatures.instance(i));
