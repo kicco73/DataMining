@@ -9,6 +9,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Properties;
 import weka.clusterers.ClusterEvaluation;
+import weka.clusterers.ClusterEvaluationEx;
 import weka.core.CosineDistance;
 import weka.clusterers.HierarchicalClusterer;
 import weka.clusterers.SimpleKMeans;
@@ -183,10 +184,10 @@ public class App {
         simpleKMeans.setDistanceFunction(df);
         simpleKMeans.setPreserveInstancesOrder(true);
         simpleKMeans.buildClusterer(finalFeatures);
-        ClusterEvaluation ce = new ClusterEvaluation();
+        ClusterEvaluationEx ce = new ClusterEvaluationEx();
         ce.setClusterer(simpleKMeans);
-        ce.evaluateClusterer(new Instances(finalFeatures));
-        System.out.println(ce.clusterResultsToString());
+        ce.evaluateClusterer(new Instances(finalFeatures), df);
+        //System.out.println(ce.clusterResultsToString());
         return simpleKMeans.getAssignments();
     }
     
@@ -196,10 +197,10 @@ public class App {
         clusterer.setNumClusters(numClusters);
         clusterer.setDistanceFunction(df);
         clusterer.buildClusterer(finalFeatures);
-        ClusterEvaluation ce = new ClusterEvaluation();
+        ClusterEvaluationEx ce = new ClusterEvaluationEx();
         ce.setClusterer(clusterer);
-        ce.evaluateClusterer(new Instances(finalFeatures));
-        System.out.println(ce.clusterResultsToString());
+        ce.evaluateClusterer(new Instances(finalFeatures), df);
+        //System.out.println(ce.clusterResultsToString());
 
         int [] assignments = new int[finalFeatures.numInstances()];
         for(int i = 0; i < finalFeatures.numInstances(); i++)
@@ -228,10 +229,13 @@ public class App {
         saveCsv(csvOutExtractFileName, finalFeatures);
 
         // Clustering with different algorithms and distance functions
-        
+        System.out.println("*** KMeans with euclidean distance");
         int kMeansAssignments[] = kMeans(new EuclideanDistance(), finalFeatures);
+        System.out.println("*** KMeans with cosine distance");
         int kMeansCosineAssignments[] = kMeans(new CosineDistance(), finalFeatures);
+        System.out.println("*** Agglomerative with euclidean distance");
         int agglomerativeAssignments[] = agglomerative(new EuclideanDistance(), finalFeatures);
+        System.out.println("*** Agglomerative with cosine distance");
         int agglomerativeCosineAssignments[] = agglomerative(new CosineDistance(), finalFeatures);
         
         // Add clustering results to dataset
