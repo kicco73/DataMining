@@ -8,7 +8,6 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Properties;
-import weka.clusterers.ClusterEvaluation;
 import weka.clusterers.ClusterEvaluationEx;
 import weka.core.CosineDistance;
 import weka.clusterers.HierarchicalClusterer;
@@ -16,6 +15,7 @@ import weka.clusterers.SimpleKMeans;
 import weka.core.Attribute;
 import weka.core.DistanceFunction;
 import weka.core.EuclideanDistance;
+import weka.core.FastVector;
 import weka.core.Instance;
 import weka.core.Instances;
 import weka.core.converters.ArffSaver;
@@ -51,6 +51,8 @@ public class App {
     static int numClusters;
     static MakeBins.Period period;
     static boolean additive;
+    private ClusterEvaluationEx bestClusterer = null;
+    private int classIndex = -1;
 
     private void loadProps(InputStream is) throws ParseException {
         Properties config;
@@ -175,7 +177,7 @@ public class App {
         return dataSet;
     }
     
-    private int[] kMeans(DistanceFunction df, Instances finalFeatures) throws Exception {
+    private ClusterEvaluationEx kMeans(DistanceFunction df, Instances finalFeatures, int index) throws Exception {
         SimpleKMeans simpleKMeans = new SimpleKMeans();
         // There's a bug in the default random initializer, so we use 1 = kmeans++
         String options[] = {"-init", "1"};
@@ -187,12 +189,14 @@ public class App {
         ClusterEvaluationEx ce = new ClusterEvaluationEx();
         ce.setClusterer(simpleKMeans);
         ce.evaluateClusterer(new Instances(finalFeatures), df);
-        //System.out.println(ce.clusterResultsToString());
-        return simpleKMeans.getAssignments();
+        if(bestClusterer == null || bestClusterer.getAvgSilhouetteCoefficient() > ce.getAvgSilhouetteCoefficient()) {
+            bestClusterer = ce;
+            classIndex = index;
+        }
+        return ce;
     }
     
-    
-    private int[] agglomerative(DistanceFunction df, Instances finalFeatures) throws Exception {
+    private ClusterEvaluationEx agglomerative(DistanceFunction df, Instances finalFeatures, int index) throws Exception {
         HierarchicalClusterer clusterer = new HierarchicalClusterer();
         clusterer.setNumClusters(numClusters);
         clusterer.setDistanceFunction(df);
@@ -200,12 +204,47 @@ public class App {
         ClusterEvaluationEx ce = new ClusterEvaluationEx();
         ce.setClusterer(clusterer);
         ce.evaluateClusterer(new Instances(finalFeatures), df);
-        //System.out.println(ce.clusterResultsToString());
-
-        int [] assignments = new int[finalFeatures.numInstances()];
-        for(int i = 0; i < finalFeatures.numInstances(); i++)
-            assignments[i] = clusterer.clusterInstance(finalFeatures.instance(i));
-        return assignments;
+        if(bestClusterer == null || bestClusterer.getAvgSilhouetteCoefficient() > ce.getAvgSilhouetteCoefficient()) {
+            bestClusterer = ce;
+            classIndex = index;
+        }
+        return ce;
+    }
+    
+    private ClusterEvaluationEx kMeansEval(DistanceFunction df, Instances finalFeatures) throws Exception {
+        SimpleKMeans simpleKMeans = new SimpleKMeans();
+        // There's a bug in the default random initializer, so we use 1 = kmeans++
+        String options[] = {"-init", "1"};
+        simpleKMeans.setOptions(options);
+        simpleKMeans.setNumClusters(numClusters);
+        simpleKMeans.setDistanceFunction(df);
+        simpleKMeans.setPreserveInstancesOrder(true);
+        Remove remove = new Remove();
+        int removeArray[] = {finalFeatures.classIndex()};
+        remove.setAttributeIndicesArray(removeArray);
+        remove.setInputFormat(finalFeatures);
+        Instances data = Filter.useFilter(finalFeatures, remove);
+        simpleKMeans.buildClusterer(data);
+        ClusterEvaluationEx ce = new ClusterEvaluationEx();
+        ce.setClusterer(simpleKMeans);
+        ce.evaluateClusterer(finalFeatures);
+        return ce;
+    }
+    
+    private ClusterEvaluationEx agglomerativeEval(DistanceFunction df, Instances finalFeatures) throws Exception {
+        HierarchicalClusterer clusterer = new HierarchicalClusterer();
+        clusterer.setNumClusters(numClusters);
+        clusterer.setDistanceFunction(df);
+        Remove remove = new Remove();
+        int removeArray[] = {finalFeatures.classIndex()};
+        remove.setAttributeIndicesArray(removeArray);
+        remove.setInputFormat(finalFeatures);
+        Instances data = Filter.useFilter(finalFeatures, remove);
+        clusterer.buildClusterer(data);
+        ClusterEvaluationEx ce = new ClusterEvaluationEx();
+        ce.setClusterer(clusterer);
+        ce.evaluateClusterer(finalFeatures);
+        return ce;
     }
     
     public void process() throws Exception {
@@ -229,32 +268,51 @@ public class App {
         saveCsv(csvOutExtractFileName, finalFeatures);
 
         // Clustering with different algorithms and distance functions
+        
         System.out.println("*** KMeans with euclidean distance");
-        int kMeansAssignments[] = kMeans(new EuclideanDistance(), finalFeatures);
-        System.out.println("*** KMeans with cosine distance");
-        int kMeansCosineAssignments[] = kMeans(new CosineDistance(), finalFeatures);
+        ClusterEvaluationEx kMeansEuclidean = kMeans(new EuclideanDistance(), finalFeatures, 0);
         System.out.println("*** Agglomerative with euclidean distance");
-        int agglomerativeAssignments[] = agglomerative(new EuclideanDistance(), finalFeatures);
+        ClusterEvaluationEx agglomerativeEuclidean = agglomerative(new EuclideanDistance(), finalFeatures, 1);
+        System.out.println("*** KMeans with cosine distance");
+        ClusterEvaluationEx kMeansCosine = kMeans(new CosineDistance(), finalFeatures, 2);
         System.out.println("*** Agglomerative with cosine distance");
-        int agglomerativeCosineAssignments[] = agglomerative(new CosineDistance(), finalFeatures);
+        ClusterEvaluationEx agglomerativeCosine = agglomerative(new CosineDistance(), finalFeatures, 3);
         
         // Add clustering results to dataset
         
-        Attribute kMeansClusterId = new Attribute("kMeansEuclidean", 0);
+        FastVector fv = new FastVector(numClusters);
+        for(int i = 0; i < numClusters; i++)
+            fv.addElement(Integer.toString(i));
+        Attribute kMeansClusterId = new Attribute("kMeansEuclidean", fv);
         finalFeatures.insertAttributeAt(kMeansClusterId, 0);
-        Attribute agglomerativeId = new Attribute("agglomerativeEuclidean", 1);
+        Attribute agglomerativeId = new Attribute("agglomerativeEuclidean", fv);
         finalFeatures.insertAttributeAt(agglomerativeId, 1);
-        Attribute kMeansCosineClusterId = new Attribute("kMeansCosine", 2);
+        Attribute kMeansCosineClusterId = new Attribute("kMeansCosine", fv);
         finalFeatures.insertAttributeAt(kMeansCosineClusterId, 2);
-        Attribute agglomerativeCosineId = new Attribute("agglomerativeCosine", 3);
+        Attribute agglomerativeCosineId = new Attribute("agglomerativeCosine", fv);
         finalFeatures.insertAttributeAt(agglomerativeCosineId, 3);
+        
         for(int i = 0; i < finalFeatures.numInstances(); i++) {
             Instance instance = finalFeatures.instance(i);
-            instance.setValue(kMeansClusterId, kMeansAssignments[i]);
-            instance.setValue(agglomerativeId, agglomerativeAssignments[i]);
-            instance.setValue(kMeansCosineClusterId, kMeansCosineAssignments[i]);
-            instance.setValue(agglomerativeCosineId, agglomerativeCosineAssignments[i]);
+            instance.setValue(0, Integer.toString((int)kMeansEuclidean.getClusterAssignments()[i]));
+            instance.setValue(1, Integer.toString((int)agglomerativeEuclidean.getClusterAssignments()[i]));
+            instance.setValue(2, Integer.toString((int)kMeansCosine.getClusterAssignments()[i]));
+            instance.setValue(3, Integer.toString((int)agglomerativeCosine.getClusterAssignments()[i]));
         }
+        
+        // Repeat to perform Classes To Cluster Analysis
+        
+        System.out.println("Best clusterer: "+bestClusterer);
+        
+        finalFeatures.setClassIndex(classIndex);
+        System.out.println("*** KMeans with euclidean distance:"+
+            kMeansEval(new EuclideanDistance(), finalFeatures).clusterResultsToString());
+        System.out.println("*** Agglomerative with euclidean distance:"+
+            agglomerativeEval(new EuclideanDistance(), finalFeatures).clusterResultsToString());
+        System.out.println("*** KMeans with cosine distance:"+
+            kMeansEval(new CosineDistance(), finalFeatures).clusterResultsToString());
+        System.out.println("*** Agglomerative with cosine distance:"+
+            agglomerativeEval(new CosineDistance(), finalFeatures).clusterResultsToString());
         
         // Export to filesystem
 

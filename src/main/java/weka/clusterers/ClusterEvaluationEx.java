@@ -16,6 +16,12 @@ import weka.core.ManhattanDistance;
  */
 public class ClusterEvaluationEx extends ClusterEvaluation {
     
+    double avgSilhouetteCoefficient = Double.MIN_VALUE;
+
+    public double getAvgSilhouetteCoefficient() {
+        return avgSilhouetteCoefficient;
+    }
+    
     private double silhouetteCoefficient(Instances instances, DistanceFunction df) {
         double clusterAssignments[] = getClusterAssignments();	
         int [] clusterSizes = new int[getNumClusters()];
@@ -54,6 +60,7 @@ public class ClusterEvaluationEx extends ClusterEvaluation {
         DistanceFunction distanceFunction = new ManhattanDistance();
         distanceFunction.setInstances(test);
         System.out.println("*** Silhouette Coefficient (Manhattan):\t" + silhouetteCoefficient(test, distanceFunction));
-        System.out.println("*** Silhouette Coefficient (custom):\t" + silhouetteCoefficient(test, df));
+        avgSilhouetteCoefficient = silhouetteCoefficient(test, df);
+        System.out.println("*** Silhouette Coefficient (custom):\t" + avgSilhouetteCoefficient);
     }
 }
