@@ -189,7 +189,7 @@ public class App {
         ClusterEvaluationEx ce = new ClusterEvaluationEx();
         ce.setClusterer(simpleKMeans);
         ce.evaluateClusterer(new Instances(finalFeatures), df);
-        if(bestClusterer == null || bestClusterer.getAvgSilhouetteCoefficient() > ce.getAvgSilhouetteCoefficient()) {
+        if(bestClusterer == null || bestClusterer.getAvgSilhouetteCoefficient() < ce.getAvgSilhouetteCoefficient()) {
             bestClusterer = ce;
             classIndex = index;
         }
@@ -204,7 +204,7 @@ public class App {
         ClusterEvaluationEx ce = new ClusterEvaluationEx();
         ce.setClusterer(clusterer);
         ce.evaluateClusterer(new Instances(finalFeatures), df);
-        if(bestClusterer == null || bestClusterer.getAvgSilhouetteCoefficient() > ce.getAvgSilhouetteCoefficient()) {
+        if(bestClusterer == null || bestClusterer.getAvgSilhouetteCoefficient() < ce.getAvgSilhouetteCoefficient()) {
             bestClusterer = ce;
             classIndex = index;
         }
@@ -249,7 +249,8 @@ public class App {
     
     public void process() throws Exception {
         // Load first set and create conditioned features
-        
+        bestClusterer = null;
+        classIndex = -1;
         Instances pickUps = loadCsv(pickupsFileName);
         pickUps = cleanData(pickUps);
         saveCsv(csvOutCleanPickUpFileName, pickUps);
